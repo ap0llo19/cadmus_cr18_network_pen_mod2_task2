@@ -1,0 +1,86 @@
+name: cr18-n2c-lab2-v1
+
+hosts:
+  - name: pentestvm
+    flavor: standard.small
+    base_box:
+      image: ubuntu-noble-x86_64
+      mgmt_user: ubuntu
+      mgmt_protocol: ssh
+    hidden: false
+
+  - name: web-gw01
+    flavor: standard.small
+    base_box:
+      image: ubuntu-noble-x86_64
+      mgmt_user: ubuntu
+      mgmt_protocol: ssh
+    hidden: true
+
+  - name: mail01
+    flavor: standard.small
+    base_box:
+      image: ubuntu-noble-x86_64
+      mgmt_user: ubuntu
+      mgmt_protocol: ssh
+    hidden: true
+
+  - name: vpn01
+    flavor: standard.small
+    base_box:
+      image: ubuntu-noble-x86_64
+      mgmt_user: ubuntu
+      mgmt_protocol: ssh
+    hidden: true
+
+routers:
+  - name: router
+    flavor: standard.small
+    base_box:
+      image: debian-12-x86_64
+      mgmt_user: debian
+      mgmt_protocol: ssh
+    hidden: false
+
+networks:
+  - name: attacker-net
+    cidr: 198.51.100.0/28
+    accessible_by_user: true
+    hidden: false
+
+  - name: public-dmz
+    cidr: 203.0.113.0/28
+    accessible_by_user: false
+    hidden: true
+
+wan:
+  name: internet-connection
+  cidr: 10.10.10.0/24
+
+net_mappings:
+  - host: pentestvm
+    network: attacker-net
+    ip: 198.51.100.10
+
+  - host: web-gw01
+    network: public-dmz
+    ip: 203.0.113.5
+
+  - host: mail01
+    network: public-dmz
+    ip: 203.0.113.6
+
+  - host: vpn01
+    network: public-dmz
+    ip: 203.0.113.7
+
+router_mappings:
+  - router: router
+    network: attacker-net
+    ip: 198.51.100.1
+
+  - router: router
+    network: public-dmz
+    ip: 203.0.113.1
+
+groups: []
