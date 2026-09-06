@@ -68,11 +68,11 @@ net_mappings:
 
   - host: mail01
     network: public-dmz
-    ip: 203.0.113.6
+    ip: 203.0.113.9
 
   - host: vpn01
     network: public-dmz
-    ip: 203.0.113.7
+    ip: 203.0.113.13
 
 router_mappings:
   - router: router
