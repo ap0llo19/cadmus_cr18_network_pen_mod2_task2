@@ -1,0 +1,1255 @@
+---
+# CADMUS Module 2: Discovery, Scanning & Enumeration
+# External scanning assessment
+#
+# Scope:
+#   - No exploitation
+#   - No brute forcing
+#   - No credential attacks
+#   - No privilege escalation
+#   - Discovery, TCP/UDP scanning, service fingerprinting, TLS/certificate
+#     inspection, virtual-host enumeration, SMTP/IMAP enumeration,
+#     IKE/IPsec identification, correlation, and reporting only.
+#
+# Routed lab topology:
+#   pentestvm   198.51.100.10   trainee workstation
+#   router      198.51.100.1    attacker-side gateway
+#   router      203.0.113.1     public-DMZ gateway
+#   WEB-GW01    203.0.113.5     nginx web gateway
+#   MAIL01      203.0.113.6     Postfix/Dovecot mail gateway
+#   VPN01       203.0.113.7     nginx + strongSwan VPN gateway
+#
+# Intended public attack surface:
+#   WEB-GW01    80/tcp, 443/tcp, 8443/tcp
+#   MAIL01      25/tcp, 465/tcp, 587/tcp, 993/tcp
+#   VPN01       443/tcp, 500/udp, 4500/udp
+
+
+# ----------------------------------------------------------------------------
+# Common Linux baseline
+# ----------------------------------------------------------------------------
+- name: Common baseline for external lab Linux machines
+  hosts: pentestvm:web-gw01:mail01:vpn01
+  become: true
+  gather_facts: true
+
+  handlers:
+    - name: Restart SSH
+      ansible.builtin.systemd:
+        name: ssh
+        state: restarted
+
+  tasks:
+    - name: Disable and mask unattended-upgrades
+      ansible.builtin.systemd:
+        name: unattended-upgrades
+        state: stopped
+        enabled: false
+        masked: true
+      failed_when: false
+
+    - name: Wait for any apt/dpkg lock to release
+      ansible.builtin.shell: >
+        while fuser /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock
+        /var/cache/apt/archives/lock /var/lib/dpkg/lock >/dev/null 2>&1; do sleep 3; done
+      changed_when: false
+      failed_when: false
+
+    - name: Install common packages
+      ansible.builtin.apt:
+        name:
+          - openssh-server
+          - python3
+          - curl
+          - iptables
+        state: present
+        update_cache: true
+
+    - name: Set system hostname
+      ansible.builtin.hostname:
+        name: "{{ inventory_hostname }}"
+
+    - name: Configure SSH login banner
+      ansible.builtin.copy:
+        dest: /etc/issue.net
+        mode: '0644'
+        content: |
+          CADMUS Module 2 External Assessment
+          Authorized administration interface.
+          Public attack-surface enumeration is limited to the assessment scope.
+
+    - name: Enable SSH banner
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?Banner'
+        line: 'Banner /etc/issue.net'
+      notify: Restart SSH
+
+    - name: Ensure SSH is running
+      ansible.builtin.systemd:
+        name: ssh
+        state: started
+        enabled: true
+
+
+# ----------------------------------------------------------------------------
+# ROUTER - routed separation between attacker network and public DMZ
+# ----------------------------------------------------------------------------
+- name: Provision external assessment router
+  hosts: router
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Install router packages
+      ansible.builtin.apt:
+        name:
+          - iptables
+        state: present
+        update_cache: true
+
+    - name: Enable IPv4 forwarding persistently
+      ansible.builtin.copy:
+        dest: /etc/sysctl.d/99-cadmus-router.conf
+        mode: '0644'
+        content: |
+          net.ipv4.ip_forward=1
+
+    - name: Apply IPv4 forwarding setting
+      ansible.builtin.command: sysctl -p /etc/sysctl.d/99-cadmus-router.conf
+      changed_when: false
+
+    - name: Create router forwarding script
+      ansible.builtin.copy:
+        dest: /usr/local/sbin/cadmus-router-forwarding.sh
+        mode: '0755'
+        content: |
+          #!/bin/sh
+          set -eu
+
+          /usr/sbin/iptables -P FORWARD ACCEPT
+
+    - name: Create persistent router forwarding service
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/cadmus-router-forwarding.service
+        mode: '0644'
+        content: |
+          [Unit]
+          Description=CADMUS External Lab Router Forwarding
+          After=network-online.target
+          Wants=network-online.target
+
+          [Service]
+          Type=oneshot
+          ExecStart=/usr/local/sbin/cadmus-router-forwarding.sh
+          RemainAfterExit=yes
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Enable and start router forwarding service
+      ansible.builtin.systemd:
+        name: cadmus-router-forwarding.service
+        state: started
+        enabled: true
+        daemon_reload: true
+
+
+# ----------------------------------------------------------------------------
+# PENTESTVM - trainee workstation
+# ----------------------------------------------------------------------------
+- name: Provision pentestvm (external attacker)
+  hosts: pentestvm
+  become: true
+  gather_facts: true
+
+  roles:
+    - role: user-access
+      user_access_username: pentester
+      user_access_password: 'pentester'
+      user_access_sudo: true
+
+  tasks:
+    - name: Install external scanning and enumeration tools
+      ansible.builtin.apt:
+        name:
+          - nmap
+          - netcat-openbsd
+          - curl
+          - openssl
+          - dnsutils
+          - whois
+          - traceroute
+          - jq
+          - ffuf
+          - gobuster
+          - ike-scan
+          - swaks
+        state: present
+        update_cache: true
+
+    - name: Add route to public assessment DMZ
+      ansible.builtin.command: ip route replace 203.0.113.0/28 via 198.51.100.1
+      changed_when: false
+
+    - name: Create persistent assessment route script
+      ansible.builtin.copy:
+        dest: /usr/local/sbin/cadmus-external-route.sh
+        mode: '0755'
+        content: |
+          #!/bin/sh
+          set -eu
+
+          for i in $(seq 1 30); do
+              if /usr/sbin/ip route get 198.51.100.1 >/dev/null 2>&1; then
+                  /usr/sbin/ip route replace 203.0.113.0/28 via 198.51.100.1
+                  exit 0
+              fi
+              sleep 1
+          done
+
+          exit 1
+
+    - name: Create persistent assessment route service
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/cadmus-external-route.service
+        mode: '0644'
+        content: |
+          [Unit]
+          Description=CADMUS External Assessment Route
+          After=network-online.target
+          Wants=network-online.target
+
+          [Service]
+          Type=oneshot
+          ExecStart=/usr/local/sbin/cadmus-external-route.sh
+          RemainAfterExit=yes
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Enable and start assessment route service
+      ansible.builtin.systemd:
+        name: cadmus-external-route.service
+        state: started
+        enabled: true
+        daemon_reload: true
+
+    - name: Create trainee working directories
+      ansible.builtin.file:
+        path: "/home/pentester/{{ item }}"
+        state: directory
+        owner: pentester
+        group: pentester
+        mode: '0755'
+      loop:
+        - Desktop
+        - Desktop/module2-external
+        - Desktop/module2-external/scans
+        - Desktop/module2-external/evidence
+
+    - name: Add external assessment scope file
+      ansible.builtin.copy:
+        dest: /home/pentester/Desktop/module2-external/scope.txt
+        owner: pentester
+        group: pentester
+        mode: '0644'
+        content: |
+          CADMUS Module 2 - External Scanning Assessment
+
+          Authorized scope:
+          - Public assessment range: 203.0.113.0/28
+          - Assessment is performed from pentestvm.
+          - The environment simulates a small Internet-facing attack surface.
+
+          Rules:
+          - Discovery, TCP/UDP scanning, service enumeration, banner grabbing,
+            TLS/certificate inspection, virtual-host enumeration, safe NSE
+            scripts, IKE/IPsec identification, and reporting are allowed.
+          - Exploitation, brute forcing, password attacks, credential attacks,
+            privilege escalation, malware, denial of service, and destructive
+            testing are not allowed.
+          - Some hosts filter ICMP echo requests. Do not assume a host is down
+            only because it does not answer ICMP.
+          - Document the public IPs, open ports, protocols, service products,
+            TLS names, virtual hosts, mail capabilities, VPN indicators, and
+            correlations that reveal the role of each public asset.
+
+    - name: Add report template
+      ansible.builtin.copy:
+        dest: /home/pentester/Desktop/module2-external/report-template.md
+        owner: pentester
+        group: pentester
+        mode: '0644'
+        content: |
+          # CADMUS Module 2 - External Scanning Report
+
+          ## 1. Scope
+          - Public range:
+          - Date:
+          - Analyst:
+
+          ## 2. External Discovery
+          | IP Address | Discovery Method | ICMP Behavior | Notes |
+          |---|---|---|---|
+
+          ## 3. TCP Attack Surface
+          | IP Address | Port | Service | Product / Version | Evidence |
+          |---|---:|---|---|---|
+
+          ## 4. UDP Attack Surface
+          | IP Address | Port | Service | Evidence |
+          |---|---:|---|---|
+
+          ## 5. TLS and Certificate Enumeration
+          | IP:Port | Subject / CN | SANs | Issuer | Notes |
+          |---|---|---|---|---|
+
+          ## 6. HTTP and Virtual Hosts
+          | IP:Port | Virtual Host | Title / Response | Evidence |
+          |---|---|---|---|
+
+          ## 7. Mail Enumeration
+          | Port | Protocol | TLS Mode | Capabilities / Banner | Notes |
+          |---:|---|---|---|---|
+
+          ## 8. VPN / IKE Enumeration
+          | Port | Protocol | Finding | Evidence |
+          |---:|---|---|---|
+
+          ## 9. Asset Correlation
+          | Public IP | Inferred Host / Role | Correlated Evidence |
+          |---|---|---|
+
+          ## 10. Findings and Recommended Next Steps
+          -
+
+    - name: Add external-enumeration command reference
+      ansible.builtin.copy:
+        dest: /home/pentester/Desktop/module2-external/safe-enumeration-examples.txt
+        owner: pentester
+        group: pentester
+        mode: '0644'
+        content: |
+          # These are examples, not a required solution path.
+
+          # Routing / scope verification
+          ip addr
+          ip route
+          traceroute 203.0.113.5
+
+          # ICMP-only discovery
+          nmap -sn -PE 203.0.113.0/28 -oA scans/01-icmp-discovery
+
+          # Treat the scoped IP range as online when discovery is filtered
+          nmap -Pn -sS --top-ports 1000 203.0.113.0/28 -oA scans/02-top-tcp
+
+          # Full TCP scan
+          nmap -Pn -sS -p- 203.0.113.0/28 -oA scans/03-full-tcp
+
+          # Service/version and safe default-script follow-up
+          nmap -Pn -sV -sC 203.0.113.5 203.0.113.6 203.0.113.7 -oA scans/04-services
+
+          # Targeted UDP discovery
+          nmap -Pn -sU -p 500,4500 203.0.113.0/28 -oA scans/05-udp-vpn
+
+          # IKE identification
+          nmap -Pn -sU -sV -p 500,4500 --script ike-version 203.0.113.7
+          sudo ike-scan 203.0.113.7
+
+          # TLS certificate inspection
+          openssl s_client -connect 203.0.113.5:443 -servername www.cadmus-corp.test </dev/null
+          openssl s_client -connect 203.0.113.5:8443 </dev/null
+          openssl s_client -connect 203.0.113.6:465 </dev/null
+          openssl s_client -connect 203.0.113.6:993 </dev/null
+          openssl s_client -connect 203.0.113.7:443 -servername vpn.cadmus-corp.test </dev/null
+
+          # HTTP inspection
+          curl -I http://203.0.113.5/
+          curl -kI https://203.0.113.5/
+          curl -kI https://203.0.113.5:8443/
+
+          # Virtual-host enumeration example after discovering the base domain
+          ffuf -k -w /home/pentester/Desktop/module2-external/vhosts.txt \
+            -u https://203.0.113.5/ \
+            -H 'Host: FUZZ.cadmus-corp.test' \
+            -mc all -ac
+
+          # SMTP / STARTTLS
+          nc -nv 203.0.113.6 25
+          swaks --server 203.0.113.6 --port 25 --quit-after EHLO
+          openssl s_client -starttls smtp -connect 203.0.113.6:25 </dev/null
+          openssl s_client -starttls smtp -connect 203.0.113.6:587 </dev/null
+
+          # IMAPS banner / certificate
+          openssl s_client -connect 203.0.113.6:993 </dev/null
+
+    - name: Add virtual-host candidate wordlist
+      ansible.builtin.copy:
+        dest: /home/pentester/Desktop/module2-external/vhosts.txt
+        owner: pentester
+        group: pentester
+        mode: '0644'
+        content: |
+          account
+          accounts
+          admin
+          api
+          app
+          auth
+          billing
+          blog
+          cdn
+          client
+          cloud
+          console
+          customer
+          customers
+          dashboard
+          dev
+          edge
+          files
+          gateway
+          help
+          intranet
+          login
+          mail
+          mobile
+          monitoring
+          mx
+          partners
+          portal
+          remote
+          secure
+          shop
+          smtp
+          sso
+          staging
+          status
+          support
+          test
+          vpn
+          web
+          www
+
+
+# ----------------------------------------------------------------------------
+# Public-DMZ routing baseline
+# ----------------------------------------------------------------------------
+- name: Configure return route on public targets
+  hosts: web-gw01:mail01:vpn01
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Add route back to attacker network
+      ansible.builtin.command: ip route replace 198.51.100.0/28 via 203.0.113.1
+      changed_when: false
+
+    - name: Create persistent return-route script
+      ansible.builtin.copy:
+        dest: /usr/local/sbin/cadmus-public-route.sh
+        mode: '0755'
+        content: |
+          #!/bin/sh
+          set -eu
+
+          for i in $(seq 1 30); do
+              if /usr/sbin/ip route get 203.0.113.1 >/dev/null 2>&1; then
+                  /usr/sbin/ip route replace 198.51.100.0/28 via 203.0.113.1
+                  exit 0
+              fi
+              sleep 1
+          done
+
+          exit 1
+
+    - name: Create persistent return-route service
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/cadmus-public-route.service
+        mode: '0644'
+        content: |
+          [Unit]
+          Description=CADMUS Public DMZ Return Route
+          After=network-online.target
+          Wants=network-online.target
+
+          [Service]
+          Type=oneshot
+          ExecStart=/usr/local/sbin/cadmus-public-route.sh
+          RemainAfterExit=yes
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Enable and start return-route service
+      ansible.builtin.systemd:
+        name: cadmus-public-route.service
+        state: started
+        enabled: true
+        daemon_reload: true
+
+
+# ----------------------------------------------------------------------------
+# WEB-GW01 - nginx, TLS, multiple virtual hosts, alternate HTTPS
+# ----------------------------------------------------------------------------
+- name: Provision WEB-GW01
+  hosts: web-gw01
+  become: true
+  gather_facts: true
+
+  handlers:
+    - name: Restart nginx on WEB-GW01
+      ansible.builtin.systemd:
+        name: nginx
+        state: restarted
+
+  tasks:
+    - name: Install WEB-GW01 packages
+      ansible.builtin.apt:
+        name:
+          - nginx
+          - openssl
+        state: present
+        update_cache: true
+
+    - name: Remove default nginx site
+      ansible.builtin.file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+      notify: Restart nginx on WEB-GW01
+
+    - name: Create WEB-GW01 document roots
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: www-data
+        group: www-data
+        mode: '0755'
+      loop:
+        - /var/www/cadmus-www
+        - /var/www/cadmus-portal
+        - /var/www/cadmus-partners
+        - /var/www/cadmus-admin
+        - /var/www/cadmus-admin/status
+
+    - name: Deploy public corporate site
+      ansible.builtin.copy:
+        dest: /var/www/cadmus-www/index.html
+        owner: www-data
+        group: www-data
+        mode: '0644'
+        content: |
+          <!doctype html>
+          <html>
+          <head><title>CADMUS Corp - Public Gateway</title></head>
+          <body>
+            <h1>CADMUS Corp</h1>
+            <p>Public services gateway.</p>
+            <p>For customer services use the appropriate company portal.</p>
+          </body>
+          </html>
+
+    - name: Deploy customer portal virtual host content
+      ansible.builtin.copy:
+        dest: /var/www/cadmus-portal/index.html
+        owner: www-data
+        group: www-data
+        mode: '0644'
+        content: |
+          <!doctype html>
+          <html>
+          <head><title>CADMUS Customer Portal</title></head>
+          <body>
+            <h1>Customer Portal</h1>
+            <p>CADMUS customer account and service portal.</p>
+            <p>Environment: production edge</p>
+          </body>
+          </html>
+
+    - name: Deploy partner portal virtual host content
+      ansible.builtin.copy:
+        dest: /var/www/cadmus-partners/index.html
+        owner: www-data
+        group: www-data
+        mode: '0644'
+        content: |
+          <!doctype html>
+          <html>
+          <head><title>CADMUS Partner Gateway</title></head>
+          <body>
+            <h1>Partner Gateway</h1>
+            <p>External integration landing page for approved CADMUS partners.</p>
+          </body>
+          </html>
+
+    - name: Deploy partner robots file
+      ansible.builtin.copy:
+        dest: /var/www/cadmus-partners/robots.txt
+        owner: www-data
+        group: www-data
+        mode: '0644'
+        content: |
+          User-agent: *
+          Disallow: /integration-status/
+
+    - name: Deploy alternate administration gateway content
+      ansible.builtin.copy:
+        dest: /var/www/cadmus-admin/index.html
+        owner: www-data
+        group: www-data
+        mode: '0644'
+        content: |
+          <!doctype html>
+          <html>
+          <head><title>CADMUS Edge Administration</title></head>
+          <body>
+            <h1>Edge Administration Gateway</h1>
+            <p>Administrative access is restricted.</p>
+            <p>Public enumeration only. Authentication attempts are out of scope.</p>
+          </body>
+          </html>
+
+    - name: Deploy alternate administration status page
+      ansible.builtin.copy:
+        dest: /var/www/cadmus-admin/status/index.html
+        owner: www-data
+        group: www-data
+        mode: '0644'
+        content: |
+          <!doctype html>
+          <html>
+          <head><title>CADMUS Edge Status</title></head>
+          <body>
+            <h1>Gateway Status</h1>
+            <ul>
+              <li>Edge proxy: online</li>
+              <li>TLS termination: online</li>
+              <li>Owner: Platform Operations</li>
+            </ul>
+          </body>
+          </html>
+
+    - name: Create wildcard TLS certificate for public HTTPS virtual hosts
+      ansible.builtin.command: >
+        openssl req -x509 -nodes -newkey rsa:2048 -days 3650
+        -subj "/CN=*.cadmus-corp.test/O=CADMUS Corp/OU=External Services"
+        -addext "subjectAltName=DNS:*.cadmus-corp.test,DNS:cadmus-corp.test"
+        -keyout /etc/ssl/private/cadmus-wildcard.key
+        -out /etc/ssl/certs/cadmus-wildcard.crt
+      args:
+        creates: /etc/ssl/certs/cadmus-wildcard.crt
+      notify: Restart nginx on WEB-GW01
+
+    - name: Create TLS certificate for alternate administration service
+      ansible.builtin.command: >
+        openssl req -x509 -nodes -newkey rsa:2048 -days 3650
+        -subj "/CN=admin.cadmus-corp.test/O=CADMUS Corp/OU=Platform Operations"
+        -addext "subjectAltName=DNS:admin.cadmus-corp.test,DNS:edge-admin.cadmus-corp.test"
+        -keyout /etc/ssl/private/cadmus-admin.key
+        -out /etc/ssl/certs/cadmus-admin.crt
+      args:
+        creates: /etc/ssl/certs/cadmus-admin.crt
+      notify: Restart nginx on WEB-GW01
+
+    - name: Configure WEB-GW01 nginx virtual hosts
+      ansible.builtin.copy:
+        dest: /etc/nginx/sites-available/cadmus-external.conf
+        mode: '0644'
+        content: |
+          server {
+              listen 80 default_server;
+              listen [::]:80 default_server;
+              server_name _;
+              add_header X-CADMUS-Edge "WEB-GW01" always;
+              return 301 https://www.cadmus-corp.test$request_uri;
+          }
+
+          server {
+              listen 443 ssl default_server;
+              listen [::]:443 ssl default_server;
+              server_name www.cadmus-corp.test;
+
+              root /var/www/cadmus-www;
+              index index.html;
+
+              ssl_certificate /etc/ssl/certs/cadmus-wildcard.crt;
+              ssl_certificate_key /etc/ssl/private/cadmus-wildcard.key;
+              ssl_protocols TLSv1.2 TLSv1.3;
+
+              add_header X-CADMUS-Edge "WEB-GW01" always;
+              add_header X-Application-Role "public-gateway" always;
+
+              location / {
+                  try_files $uri $uri/ =404;
+              }
+          }
+
+          server {
+              listen 443 ssl;
+              listen [::]:443 ssl;
+              server_name portal.cadmus-corp.test;
+
+              root /var/www/cadmus-portal;
+              index index.html;
+
+              ssl_certificate /etc/ssl/certs/cadmus-wildcard.crt;
+              ssl_certificate_key /etc/ssl/private/cadmus-wildcard.key;
+              ssl_protocols TLSv1.2 TLSv1.3;
+
+              add_header X-CADMUS-Edge "WEB-GW01" always;
+              add_header X-Application-Role "customer-portal" always;
+
+              location / {
+                  try_files $uri $uri/ =404;
+              }
+          }
+
+          server {
+              listen 443 ssl;
+              listen [::]:443 ssl;
+              server_name partners.cadmus-corp.test;
+
+              root /var/www/cadmus-partners;
+              index index.html;
+
+              ssl_certificate /etc/ssl/certs/cadmus-wildcard.crt;
+              ssl_certificate_key /etc/ssl/private/cadmus-wildcard.key;
+              ssl_protocols TLSv1.2 TLSv1.3;
+
+              add_header X-CADMUS-Edge "WEB-GW01" always;
+              add_header X-Application-Role "partner-gateway" always;
+
+              location / {
+                  try_files $uri $uri/ =404;
+              }
+          }
+
+          server {
+              listen 8443 ssl default_server;
+              listen [::]:8443 ssl default_server;
+              server_name _;
+
+              ssl_certificate /etc/ssl/certs/cadmus-admin.crt;
+              ssl_certificate_key /etc/ssl/private/cadmus-admin.key;
+              ssl_protocols TLSv1.2 TLSv1.3;
+
+              add_header X-CADMUS-Edge "WEB-GW01" always;
+              return 421;
+          }
+
+          server {
+              listen 8443 ssl;
+              listen [::]:8443 ssl;
+              server_name admin.cadmus-corp.test edge-admin.cadmus-corp.test;
+
+              root /var/www/cadmus-admin;
+              index index.html;
+
+              ssl_certificate /etc/ssl/certs/cadmus-admin.crt;
+              ssl_certificate_key /etc/ssl/private/cadmus-admin.key;
+              ssl_protocols TLSv1.2 TLSv1.3;
+
+              add_header X-CADMUS-Edge "WEB-GW01" always;
+              add_header X-Application-Role "edge-administration" always;
+
+              location / {
+                  try_files $uri $uri/ =404;
+              }
+          }
+      notify: Restart nginx on WEB-GW01
+
+    - name: Enable WEB-GW01 nginx configuration
+      ansible.builtin.file:
+        src: /etc/nginx/sites-available/cadmus-external.conf
+        dest: /etc/nginx/sites-enabled/cadmus-external.conf
+        state: link
+      notify: Restart nginx on WEB-GW01
+
+    - name: Validate WEB-GW01 nginx configuration
+      ansible.builtin.command: nginx -t
+      changed_when: false
+
+    - name: Ensure nginx is running on WEB-GW01
+      ansible.builtin.systemd:
+        name: nginx
+        state: started
+        enabled: true
+
+
+# ----------------------------------------------------------------------------
+# MAIL01 - Postfix/Dovecot, SMTP submission, SMTPS, IMAPS, TLS
+# ----------------------------------------------------------------------------
+- name: Provision MAIL01
+  hosts: mail01
+  become: true
+  gather_facts: true
+
+  handlers:
+    - name: Restart Postfix
+      ansible.builtin.systemd:
+        name: postfix
+        state: restarted
+
+    - name: Restart Dovecot
+      ansible.builtin.systemd:
+        name: dovecot
+        state: restarted
+
+  tasks:
+    - name: Preseed Postfix mail type
+      ansible.builtin.debconf:
+        name: postfix
+        question: postfix/main_mailer_type
+        value: 'Internet Site'
+        vtype: select
+
+    - name: Preseed Postfix mail name
+      ansible.builtin.debconf:
+        name: postfix
+        question: postfix/mailname
+        value: mail.cadmus-corp.test
+        vtype: string
+
+    - name: Install MAIL01 packages
+      ansible.builtin.apt:
+        name:
+          - postfix
+          - dovecot-imapd
+          - openssl
+        state: present
+        update_cache: true
+
+    - name: Create MAIL01 TLS certificate
+      ansible.builtin.command: >
+        openssl req -x509 -nodes -newkey rsa:2048 -days 3650
+        -subj "/CN=mail.cadmus-corp.test/O=CADMUS Corp/OU=Messaging Services"
+        -addext "subjectAltName=DNS:mail.cadmus-corp.test,DNS:smtp.cadmus-corp.test,DNS:imap.cadmus-corp.test"
+        -keyout /etc/ssl/private/mail01.key
+        -out /etc/ssl/certs/mail01.crt
+      args:
+        creates: /etc/ssl/certs/mail01.crt
+      notify:
+        - Restart Postfix
+        - Restart Dovecot
+
+    - name: Configure Postfix main settings
+      ansible.builtin.command: "postconf -e '{{ item }}'"
+      loop:
+        - 'myhostname = mail.cadmus-corp.test'
+        - 'mydomain = cadmus-corp.test'
+        - 'myorigin = $mydomain'
+        - 'inet_interfaces = all'
+        - 'inet_protocols = ipv4'
+        - 'mydestination = $myhostname, localhost.$mydomain, localhost, $mydomain'
+        - 'smtpd_banner = mail.cadmus-corp.test ESMTP Postfix'
+        - 'disable_vrfy_command = no'
+        - 'smtpd_tls_cert_file = /etc/ssl/certs/mail01.crt'
+        - 'smtpd_tls_key_file = /etc/ssl/private/mail01.key'
+        - 'smtpd_tls_security_level = may'
+        - 'smtpd_tls_auth_only = yes'
+        - 'smtpd_sasl_auth_enable = no'
+      changed_when: true
+      notify: Restart Postfix
+
+    - name: Enable Postfix submission and SMTPS listeners
+      ansible.builtin.blockinfile:
+        path: /etc/postfix/master.cf
+        marker: "# {mark} CADMUS EXTERNAL SMTP SERVICES"
+        block: |
+          submission inet n       -       y       -       -       smtpd
+            -o syslog_name=postfix/submission
+            -o smtpd_tls_security_level=encrypt
+            -o smtpd_sasl_auth_enable=no
+
+          smtps     inet  n       -       y       -       -       smtpd
+            -o syslog_name=postfix/smtps
+            -o smtpd_tls_wrappermode=yes
+            -o smtpd_sasl_auth_enable=no
+      notify: Restart Postfix
+
+    - name: Configure Dovecot for IMAPS only
+      ansible.builtin.copy:
+        dest: /etc/dovecot/dovecot.conf
+        mode: '0644'
+        content: |
+          protocols = imap
+          listen = *
+          login_greeting = mail.cadmus-corp.test Dovecot ready.
+
+          ssl = required
+          ssl_cert = </etc/ssl/certs/mail01.crt
+          ssl_key = </etc/ssl/private/mail01.key
+
+          disable_plaintext_auth = yes
+          auth_mechanisms = plain login
+          mail_location = maildir:~/Maildir
+
+          passdb {
+            driver = pam
+          }
+
+          userdb {
+            driver = passwd
+          }
+
+          service imap-login {
+            inet_listener imap {
+              port = 0
+            }
+
+            inet_listener imaps {
+              port = 993
+              ssl = yes
+            }
+          }
+      notify: Restart Dovecot
+
+    - name: Validate Postfix configuration
+      ansible.builtin.command: postfix check
+      changed_when: false
+
+    - name: Ensure MAIL01 services are running
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: started
+        enabled: true
+      loop:
+        - postfix
+        - dovecot
+
+
+# ----------------------------------------------------------------------------
+# VPN01 - nginx HTTPS portal + strongSwan IKE/IPsec
+# ----------------------------------------------------------------------------
+- name: Provision VPN01
+  hosts: vpn01
+  become: true
+  gather_facts: true
+
+  handlers:
+    - name: Restart nginx on VPN01
+      ansible.builtin.systemd:
+        name: nginx
+        state: restarted
+
+    - name: Restart strongSwan
+      ansible.builtin.systemd:
+        name: strongswan-starter
+        state: restarted
+
+  tasks:
+    - name: Install VPN01 packages
+      ansible.builtin.apt:
+        name:
+          - nginx
+          - openssl
+          - strongswan-starter
+        state: present
+        update_cache: true
+
+    - name: Remove default VPN01 nginx site
+      ansible.builtin.file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+      notify: Restart nginx on VPN01
+
+    - name: Create VPN portal document root
+      ansible.builtin.file:
+        path: /var/www/cadmus-vpn
+        state: directory
+        owner: www-data
+        group: www-data
+        mode: '0755'
+
+    - name: Deploy VPN portal page
+      ansible.builtin.copy:
+        dest: /var/www/cadmus-vpn/index.html
+        owner: www-data
+        group: www-data
+        mode: '0644'
+        content: |
+          <!doctype html>
+          <html>
+          <head><title>CADMUS Remote Access</title></head>
+          <body>
+            <h1>CADMUS Remote Access Gateway</h1>
+            <p>Corporate remote-access service.</p>
+            <p>Gateway type: IPsec VPN</p>
+            <p>Authorized users must use the managed VPN client.</p>
+          </body>
+          </html>
+
+    - name: Create VPN01 HTTPS certificate
+      ansible.builtin.command: >
+        openssl req -x509 -nodes -newkey rsa:2048 -days 3650
+        -subj "/CN=vpn.cadmus-corp.test/O=CADMUS Corp/OU=Remote Access"
+        -addext "subjectAltName=DNS:vpn.cadmus-corp.test,DNS:remote.cadmus-corp.test"
+        -keyout /etc/ssl/private/vpn01.key
+        -out /etc/ssl/certs/vpn01.crt
+      args:
+        creates: /etc/ssl/certs/vpn01.crt
+      notify: Restart nginx on VPN01
+
+    - name: Configure VPN01 HTTPS portal
+      ansible.builtin.copy:
+        dest: /etc/nginx/sites-available/cadmus-vpn.conf
+        mode: '0644'
+        content: |
+          server {
+              listen 443 ssl default_server;
+              listen [::]:443 ssl default_server;
+              server_name vpn.cadmus-corp.test remote.cadmus-corp.test;
+
+              root /var/www/cadmus-vpn;
+              index index.html;
+
+              ssl_certificate /etc/ssl/certs/vpn01.crt;
+              ssl_certificate_key /etc/ssl/private/vpn01.key;
+              ssl_protocols TLSv1.2 TLSv1.3;
+
+              add_header X-CADMUS-Gateway "VPN01" always;
+              add_header X-Service-Role "remote-access" always;
+
+              location / {
+                  try_files $uri $uri/ =404;
+              }
+          }
+      notify: Restart nginx on VPN01
+
+    - name: Enable VPN01 nginx site
+      ansible.builtin.file:
+        src: /etc/nginx/sites-available/cadmus-vpn.conf
+        dest: /etc/nginx/sites-enabled/cadmus-vpn.conf
+        state: link
+      notify: Restart nginx on VPN01
+
+    - name: Validate VPN01 nginx configuration
+      ansible.builtin.command: nginx -t
+      changed_when: false
+
+    - name: Configure strongSwan IKE responder
+      ansible.builtin.copy:
+        dest: /etc/ipsec.conf
+        mode: '0644'
+        content: |
+          config setup
+              uniqueids=no
+
+          conn %default
+              keyexchange=ikev2
+              type=tunnel
+              fragmentation=yes
+              dpdaction=clear
+              dpddelay=30s
+              rekey=no
+
+          conn cadmus-remote-access
+              left=%any
+              leftid=@vpn.cadmus-corp.test
+              leftsubnet=10.250.0.0/24
+              leftauth=psk
+
+              right=%any
+              rightid=%any
+              rightauth=psk
+              rightsourceip=10.250.10.0/24
+
+              ike=aes256-sha256-modp2048,aes128-sha256-modp2048
+              esp=aes256-sha256,aes128-sha256
+              auto=add
+      notify: Restart strongSwan
+
+    - name: Configure strongSwan training PSK
+      ansible.builtin.copy:
+        dest: /etc/ipsec.secrets
+        owner: root
+        group: root
+        mode: '0600'
+        content: |
+          @vpn.cadmus-corp.test %any : PSK "CADMUS-External-Lab-PSK-Not-For-Trainee-Use"
+      notify: Restart strongSwan
+
+    - name: Ensure VPN01 services are running
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: started
+        enabled: true
+        daemon_reload: true
+      loop:
+        - nginx
+        - strongswan-starter
+
+
+# ----------------------------------------------------------------------------
+# Public-interface filtering
+# ----------------------------------------------------------------------------
+# These rules apply only to the interface that owns each public-DMZ IP.
+# The management interface used by Kipo/Ansible is not filtered.
+- name: Apply external-facing filtering to WEB-GW01
+  hosts: web-gw01
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Install WEB-GW01 public-interface filtering script
+      ansible.builtin.copy:
+        dest: /usr/local/sbin/cadmus-public-filter.sh
+        mode: '0755'
+        content: |
+          #!/bin/sh
+          set -eu
+
+          PUB_IF="$(/usr/sbin/ip -o -4 addr show | awk '$4 ~ /^203\.0\.113\.5\// {print $2; exit}')"
+          [ -n "$PUB_IF" ] || exit 1
+
+          /usr/sbin/iptables -N CADMUS_EXT 2>/dev/null || true
+          /usr/sbin/iptables -F CADMUS_EXT
+
+          while /usr/sbin/iptables -C INPUT -i "$PUB_IF" -j CADMUS_EXT 2>/dev/null; do
+              /usr/sbin/iptables -D INPUT -i "$PUB_IF" -j CADMUS_EXT
+          done
+
+          /usr/sbin/iptables -I INPUT 1 -i "$PUB_IF" -j CADMUS_EXT
+          /usr/sbin/iptables -A CADMUS_EXT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+          /usr/sbin/iptables -A CADMUS_EXT -p tcp -m multiport --dports 80,443,8443 -j ACCEPT
+          /usr/sbin/iptables -A CADMUS_EXT -p icmp --icmp-type echo-request -j DROP
+          /usr/sbin/iptables -A CADMUS_EXT -j DROP
+
+    - name: Create WEB-GW01 filtering service
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/cadmus-public-filter.service
+        mode: '0644'
+        content: |
+          [Unit]
+          Description=CADMUS External Public Interface Filter
+          After=network-online.target nginx.service
+          Wants=network-online.target
+
+          [Service]
+          Type=oneshot
+          ExecStart=/usr/local/sbin/cadmus-public-filter.sh
+          RemainAfterExit=yes
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Enable and start WEB-GW01 filtering service
+      ansible.builtin.systemd:
+        name: cadmus-public-filter.service
+        state: started
+        enabled: true
+        daemon_reload: true
+
+
+- name: Apply external-facing filtering to MAIL01
+  hosts: mail01
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Install MAIL01 public-interface filtering script
+      ansible.builtin.copy:
+        dest: /usr/local/sbin/cadmus-public-filter.sh
+        mode: '0755'
+        content: |
+          #!/bin/sh
+          set -eu
+
+          PUB_IF="$(/usr/sbin/ip -o -4 addr show | awk '$4 ~ /^203\.0\.113\.6\// {print $2; exit}')"
+          [ -n "$PUB_IF" ] || exit 1
+
+          /usr/sbin/iptables -N CADMUS_EXT 2>/dev/null || true
+          /usr/sbin/iptables -F CADMUS_EXT
+
+          while /usr/sbin/iptables -C INPUT -i "$PUB_IF" -j CADMUS_EXT 2>/dev/null; do
+              /usr/sbin/iptables -D INPUT -i "$PUB_IF" -j CADMUS_EXT
+          done
+
+          /usr/sbin/iptables -I INPUT 1 -i "$PUB_IF" -j CADMUS_EXT
+          /usr/sbin/iptables -A CADMUS_EXT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+          /usr/sbin/iptables -A CADMUS_EXT -p tcp -m multiport --dports 25,465,587,993 -j ACCEPT
+          /usr/sbin/iptables -A CADMUS_EXT -p icmp --icmp-type echo-request -j DROP
+          /usr/sbin/iptables -A CADMUS_EXT -j DROP
+
+    - name: Create MAIL01 filtering service
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/cadmus-public-filter.service
+        mode: '0644'
+        content: |
+          [Unit]
+          Description=CADMUS External Public Interface Filter
+          After=network-online.target postfix.service dovecot.service
+          Wants=network-online.target
+
+          [Service]
+          Type=oneshot
+          ExecStart=/usr/local/sbin/cadmus-public-filter.sh
+          RemainAfterExit=yes
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Enable and start MAIL01 filtering service
+      ansible.builtin.systemd:
+        name: cadmus-public-filter.service
+        state: started
+        enabled: true
+        daemon_reload: true
+
+
+- name: Apply external-facing filtering to VPN01
+  hosts: vpn01
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Install VPN01 public-interface filtering script
+      ansible.builtin.copy:
+        dest: /usr/local/sbin/cadmus-public-filter.sh
+        mode: '0755'
+        content: |
+          #!/bin/sh
+          set -eu
+
+          PUB_IF="$(/usr/sbin/ip -o -4 addr show | awk '$4 ~ /^203\.0\.113\.7\// {print $2; exit}')"
+          [ -n "$PUB_IF" ] || exit 1
+
+          /usr/sbin/iptables -N CADMUS_EXT 2>/dev/null || true
+          /usr/sbin/iptables -F CADMUS_EXT
+
+          while /usr/sbin/iptables -C INPUT -i "$PUB_IF" -j CADMUS_EXT 2>/dev/null; do
+              /usr/sbin/iptables -D INPUT -i "$PUB_IF" -j CADMUS_EXT
+          done
+
+          /usr/sbin/iptables -I INPUT 1 -i "$PUB_IF" -j CADMUS_EXT
+          /usr/sbin/iptables -A CADMUS_EXT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+          /usr/sbin/iptables -A CADMUS_EXT -p tcp --dport 443 -j ACCEPT
+          /usr/sbin/iptables -A CADMUS_EXT -p udp -m multiport --dports 500,4500 -j ACCEPT
+          /usr/sbin/iptables -A CADMUS_EXT -p icmp --icmp-type echo-request -j DROP
+          /usr/sbin/iptables -A CADMUS_EXT -j DROP
+
+    - name: Create VPN01 filtering service
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/cadmus-public-filter.service
+        mode: '0644'
+        content: |
+          [Unit]
+          Description=CADMUS External Public Interface Filter
+          After=network-online.target nginx.service strongswan-starter.service
+          Wants=network-online.target
+
+          [Service]
+          Type=oneshot
+          ExecStart=/usr/local/sbin/cadmus-public-filter.sh
+          RemainAfterExit=yes
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Enable and start VPN01 filtering service
+      ansible.builtin.systemd:
+        name: cadmus-public-filter.service
+        state: started
+        enabled: true
+        daemon_reload: true
