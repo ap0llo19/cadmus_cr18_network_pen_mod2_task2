@@ -1,0 +1,5 @@
+# APG variables. This lab does not require generated flags or secrets.
+# The goal is realistic external discovery, TCP/UDP scanning, service
+# fingerprinting, TLS/certificate inspection, virtual-host enumeration,
+# SMTP/IMAP enumeration, IKE/IPsec identification, correlation, and reporting.
+{}
