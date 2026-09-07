@@ -1279,6 +1279,7 @@
           /usr/sbin/iptables -w 10 -A CADMUS_EXT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
           /usr/sbin/iptables -w 10 -A CADMUS_EXT -p tcp --dport 443 -j ACCEPT
           /usr/sbin/iptables -w 10 -A CADMUS_EXT -p udp -m multiport --dports 500,4500 -j ACCEPT
+          /usr/sbin/iptables -w 10 -A CADMUS_EXT -p udp -j REJECT --reject-with icmp-port-unreachable
           /usr/sbin/iptables -w 10 -A CADMUS_EXT -p icmp --icmp-type echo-request -j DROP
           /usr/sbin/iptables -w 10 -A CADMUS_EXT -j DROP
 
