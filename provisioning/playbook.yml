@@ -1100,21 +1100,21 @@
           #!/bin/sh
           set -eu
 
-          PUB_IF="$(/usr/sbin/ip -o -4 addr show | awk '$4 ~ /^203\.0\.113\.5\// {print $2; exit}')"
-          [ -n "$PUB_IF" ] || exit 1
+          PUB_IF="$(/usr/sbin/ip route get 203.0.113.1 2>/dev/null | awk '{for (i=1; i<=NF; i++) if ($i=="dev") {print $(i+1); exit}}')"
+          [ -n "$PUB_IF" ] || { echo "Unable to determine public DMZ interface" >&2; exit 1; }
 
-          /usr/sbin/iptables -N CADMUS_EXT 2>/dev/null || true
-          /usr/sbin/iptables -F CADMUS_EXT
+          /usr/sbin/iptables -w 10 -N CADMUS_EXT 2>/dev/null || true
+          /usr/sbin/iptables -w 10 -F CADMUS_EXT
 
-          while /usr/sbin/iptables -C INPUT -i "$PUB_IF" -j CADMUS_EXT 2>/dev/null; do
-              /usr/sbin/iptables -D INPUT -i "$PUB_IF" -j CADMUS_EXT
+          while /usr/sbin/iptables -w 10 -C INPUT -i "$PUB_IF" -j CADMUS_EXT 2>/dev/null; do
+              /usr/sbin/iptables -w 10 -D INPUT -i "$PUB_IF" -j CADMUS_EXT
           done
 
-          /usr/sbin/iptables -I INPUT 1 -i "$PUB_IF" -j CADMUS_EXT
-          /usr/sbin/iptables -A CADMUS_EXT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
-          /usr/sbin/iptables -A CADMUS_EXT -p tcp -m multiport --dports 80,443,8443 -j ACCEPT
-          /usr/sbin/iptables -A CADMUS_EXT -p icmp --icmp-type echo-request -j DROP
-          /usr/sbin/iptables -A CADMUS_EXT -j DROP
+          /usr/sbin/iptables -w 10 -I INPUT 1 -i "$PUB_IF" -j CADMUS_EXT
+          /usr/sbin/iptables -w 10 -A CADMUS_EXT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+          /usr/sbin/iptables -w 10 -A CADMUS_EXT -p tcp -m multiport --dports 80,443,8443 -j ACCEPT
+          /usr/sbin/iptables -w 10 -A CADMUS_EXT -p icmp --icmp-type echo-request -j DROP
+          /usr/sbin/iptables -w 10 -A CADMUS_EXT -j DROP
 
     - name: Create WEB-GW01 filtering service
       ansible.builtin.copy:
@@ -1137,7 +1137,7 @@
     - name: Enable and start WEB-GW01 filtering service
       ansible.builtin.systemd:
         name: cadmus-public-filter.service
-        state: started
+        state: restarted
         enabled: true
         daemon_reload: true
 
@@ -1156,21 +1156,21 @@
           #!/bin/sh
           set -eu
 
-          PUB_IF="$(/usr/sbin/ip -o -4 addr show | awk '$4 ~ /^203\.0\.113\.6\// {print $2; exit}')"
-          [ -n "$PUB_IF" ] || exit 1
+          PUB_IF="$(/usr/sbin/ip route get 203.0.113.1 2>/dev/null | awk '{for (i=1; i<=NF; i++) if ($i=="dev") {print $(i+1); exit}}')"
+          [ -n "$PUB_IF" ] || { echo "Unable to determine public DMZ interface" >&2; exit 1; }
 
-          /usr/sbin/iptables -N CADMUS_EXT 2>/dev/null || true
-          /usr/sbin/iptables -F CADMUS_EXT
+          /usr/sbin/iptables -w 10 -N CADMUS_EXT 2>/dev/null || true
+          /usr/sbin/iptables -w 10 -F CADMUS_EXT
 
-          while /usr/sbin/iptables -C INPUT -i "$PUB_IF" -j CADMUS_EXT 2>/dev/null; do
-              /usr/sbin/iptables -D INPUT -i "$PUB_IF" -j CADMUS_EXT
+          while /usr/sbin/iptables -w 10 -C INPUT -i "$PUB_IF" -j CADMUS_EXT 2>/dev/null; do
+              /usr/sbin/iptables -w 10 -D INPUT -i "$PUB_IF" -j CADMUS_EXT
           done
 
-          /usr/sbin/iptables -I INPUT 1 -i "$PUB_IF" -j CADMUS_EXT
-          /usr/sbin/iptables -A CADMUS_EXT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
-          /usr/sbin/iptables -A CADMUS_EXT -p tcp -m multiport --dports 25,465,587,993 -j ACCEPT
-          /usr/sbin/iptables -A CADMUS_EXT -p icmp --icmp-type echo-request -j DROP
-          /usr/sbin/iptables -A CADMUS_EXT -j DROP
+          /usr/sbin/iptables -w 10 -I INPUT 1 -i "$PUB_IF" -j CADMUS_EXT
+          /usr/sbin/iptables -w 10 -A CADMUS_EXT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+          /usr/sbin/iptables -w 10 -A CADMUS_EXT -p tcp -m multiport --dports 25,465,587,993 -j ACCEPT
+          /usr/sbin/iptables -w 10 -A CADMUS_EXT -p icmp --icmp-type echo-request -j DROP
+          /usr/sbin/iptables -w 10 -A CADMUS_EXT -j DROP
 
     - name: Create MAIL01 filtering service
       ansible.builtin.copy:
@@ -1193,7 +1193,7 @@
     - name: Enable and start MAIL01 filtering service
       ansible.builtin.systemd:
         name: cadmus-public-filter.service
-        state: started
+        state: restarted
         enabled: true
         daemon_reload: true
 
@@ -1212,22 +1212,22 @@
           #!/bin/sh
           set -eu
 
-          PUB_IF="$(/usr/sbin/ip -o -4 addr show | awk '$4 ~ /^203\.0\.113\.7\// {print $2; exit}')"
-          [ -n "$PUB_IF" ] || exit 1
+          PUB_IF="$(/usr/sbin/ip route get 203.0.113.1 2>/dev/null | awk '{for (i=1; i<=NF; i++) if ($i=="dev") {print $(i+1); exit}}')"
+          [ -n "$PUB_IF" ] || { echo "Unable to determine public DMZ interface" >&2; exit 1; }
 
-          /usr/sbin/iptables -N CADMUS_EXT 2>/dev/null || true
-          /usr/sbin/iptables -F CADMUS_EXT
+          /usr/sbin/iptables -w 10 -N CADMUS_EXT 2>/dev/null || true
+          /usr/sbin/iptables -w 10 -F CADMUS_EXT
 
-          while /usr/sbin/iptables -C INPUT -i "$PUB_IF" -j CADMUS_EXT 2>/dev/null; do
-              /usr/sbin/iptables -D INPUT -i "$PUB_IF" -j CADMUS_EXT
+          while /usr/sbin/iptables -w 10 -C INPUT -i "$PUB_IF" -j CADMUS_EXT 2>/dev/null; do
+              /usr/sbin/iptables -w 10 -D INPUT -i "$PUB_IF" -j CADMUS_EXT
           done
 
-          /usr/sbin/iptables -I INPUT 1 -i "$PUB_IF" -j CADMUS_EXT
-          /usr/sbin/iptables -A CADMUS_EXT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
-          /usr/sbin/iptables -A CADMUS_EXT -p tcp --dport 443 -j ACCEPT
-          /usr/sbin/iptables -A CADMUS_EXT -p udp -m multiport --dports 500,4500 -j ACCEPT
-          /usr/sbin/iptables -A CADMUS_EXT -p icmp --icmp-type echo-request -j DROP
-          /usr/sbin/iptables -A CADMUS_EXT -j DROP
+          /usr/sbin/iptables -w 10 -I INPUT 1 -i "$PUB_IF" -j CADMUS_EXT
+          /usr/sbin/iptables -w 10 -A CADMUS_EXT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+          /usr/sbin/iptables -w 10 -A CADMUS_EXT -p tcp --dport 443 -j ACCEPT
+          /usr/sbin/iptables -w 10 -A CADMUS_EXT -p udp -m multiport --dports 500,4500 -j ACCEPT
+          /usr/sbin/iptables -w 10 -A CADMUS_EXT -p icmp --icmp-type echo-request -j DROP
+          /usr/sbin/iptables -w 10 -A CADMUS_EXT -j DROP
 
     - name: Create VPN01 filtering service
       ansible.builtin.copy:
@@ -1250,6 +1250,6 @@
     - name: Enable and start VPN01 filtering service
       ansible.builtin.systemd:
         name: cadmus-public-filter.service
-        state: started
+        state: restarted
         enabled: true
         daemon_reload: true
