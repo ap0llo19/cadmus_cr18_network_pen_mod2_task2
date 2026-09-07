@@ -655,19 +655,59 @@
     - name: Configure WEB-GW01 nginx virtual hosts
       ansible.builtin.copy:
         dest: /etc/nginx/sites-available/cadmus-external.conf
+        owner: root
+        group: root
         mode: '0644'
         content: |
+          # ----------------------------------------------------------
+          # TCP/80 - Catch-all
+          # ----------------------------------------------------------
           server {
               listen 80 default_server;
               listen [::]:80 default_server;
               server_name _;
+
               add_header X-CADMUS-Edge "WEB-GW01" always;
+
+              return 404;
+          }
+
+          # ----------------------------------------------------------
+          # TCP/80 - Public corporate site
+          # ----------------------------------------------------------
+          server {
+              listen 80;
+              listen [::]:80;
+              server_name www.cadmus-corp.test;
+
+              add_header X-CADMUS-Edge "WEB-GW01" always;
+
               return 301 https://www.cadmus-corp.test$request_uri;
           }
 
+          # ----------------------------------------------------------
+          # TCP/443 - Catch-all
+          # ----------------------------------------------------------
           server {
               listen 443 ssl default_server;
               listen [::]:443 ssl default_server;
+              server_name _;
+
+              ssl_certificate /etc/ssl/certs/cadmus-wildcard.crt;
+              ssl_certificate_key /etc/ssl/private/cadmus-wildcard.key;
+              ssl_protocols TLSv1.2 TLSv1.3;
+
+              add_header X-CADMUS-Edge "WEB-GW01" always;
+
+              return 404;
+          }
+
+          # ----------------------------------------------------------
+          # TCP/443 - Public corporate site
+          # ----------------------------------------------------------
+          server {
+              listen 443 ssl;
+              listen [::]:443 ssl;
               server_name www.cadmus-corp.test;
 
               root /var/www/cadmus-www;
@@ -685,6 +725,9 @@
               }
           }
 
+          # ----------------------------------------------------------
+          # TCP/443 - Customer portal
+          # ----------------------------------------------------------
           server {
               listen 443 ssl;
               listen [::]:443 ssl;
@@ -705,6 +748,9 @@
               }
           }
 
+          # ----------------------------------------------------------
+          # TCP/443 - Partner portal
+          # ----------------------------------------------------------
           server {
               listen 443 ssl;
               listen [::]:443 ssl;
@@ -725,6 +771,9 @@
               }
           }
 
+          # ----------------------------------------------------------
+          # TCP/8443 - Catch-all
+          # ----------------------------------------------------------
           server {
               listen 8443 ssl default_server;
               listen [::]:8443 ssl default_server;
@@ -735,13 +784,17 @@
               ssl_protocols TLSv1.2 TLSv1.3;
 
               add_header X-CADMUS-Edge "WEB-GW01" always;
-              return 421;
+
+              return 404;
           }
 
+          # ----------------------------------------------------------
+          # TCP/8443 - Administration gateway
+          # ----------------------------------------------------------
           server {
               listen 8443 ssl;
               listen [::]:8443 ssl;
-              server_name admin.cadmus-corp.test edge-admin.cadmus-corp.test;
+              server_name admin.cadmus-corp.test;
 
               root /var/www/cadmus-admin;
               index index.html;
