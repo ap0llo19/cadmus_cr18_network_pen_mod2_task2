@@ -358,11 +358,11 @@
           sudo ike-scan 203.0.113.7
 
           # TLS certificate inspection
-          openssl s_client -connect 203.0.113.5:443 -servername www.cadmus-corp.test </dev/null
+          openssl s_client -connect 203.0.113.5:443 -servername www.cadmus-corp.lab </dev/null
           openssl s_client -connect 203.0.113.5:8443 </dev/null
           openssl s_client -connect 203.0.113.6:465 </dev/null
           openssl s_client -connect 203.0.113.6:993 </dev/null
-          openssl s_client -connect 203.0.113.7:443 -servername vpn.cadmus-corp.test </dev/null
+          openssl s_client -connect 203.0.113.7:443 -servername vpn.cadmus-corp.lab </dev/null
 
           # HTTP inspection
           curl -I http://203.0.113.5/
@@ -372,7 +372,7 @@
           # Virtual-host enumeration example after discovering the base domain
           ffuf -k -w /home/pentester/Desktop/module2-external/vhosts.txt \
             -u https://203.0.113.5/ \
-            -H 'Host: FUZZ.cadmus-corp.test' \
+            -H 'Host: FUZZ.cadmus-corp.lab' \
             -mc all -ac
 
           # SMTP / STARTTLS
@@ -633,8 +633,8 @@
     - name: Create wildcard TLS certificate for public HTTPS virtual hosts
       ansible.builtin.command: >
         openssl req -x509 -nodes -newkey rsa:2048 -days 3650
-        -subj "/CN=*.cadmus-corp.test/O=CADMUS Corp/OU=External Services"
-        -addext "subjectAltName=DNS:*.cadmus-corp.test,DNS:cadmus-corp.test"
+        -subj "/CN=*.cadmus-corp.lab/O=CADMUS Corp/OU=External Services"
+        -addext "subjectAltName=DNS:*.cadmus-corp.lab,DNS:cadmus-corp.lab"
         -keyout /etc/ssl/private/cadmus-wildcard.key
         -out /etc/ssl/certs/cadmus-wildcard.crt
       args:
@@ -644,8 +644,8 @@
     - name: Create TLS certificate for alternate administration service
       ansible.builtin.command: >
         openssl req -x509 -nodes -newkey rsa:2048 -days 3650
-        -subj "/CN=admin.cadmus-corp.test/O=CADMUS Corp/OU=Platform Operations"
-        -addext "subjectAltName=DNS:admin.cadmus-corp.test,DNS:edge-admin.cadmus-corp.test"
+        -subj "/CN=admin.cadmus-corp.lab/O=CADMUS Corp/OU=Platform Operations"
+        -addext "subjectAltName=DNS:admin.cadmus-corp.lab,DNS:edge-admin.cadmus-corp.lab"
         -keyout /etc/ssl/private/cadmus-admin.key
         -out /etc/ssl/certs/cadmus-admin.crt
       args:
@@ -678,11 +678,11 @@
           server {
               listen 80;
               listen [::]:80;
-              server_name www.cadmus-corp.test;
+              server_name www.cadmus-corp.lab;
 
               add_header X-CADMUS-Edge "WEB-GW01" always;
 
-              return 301 https://www.cadmus-corp.test$request_uri;
+              return 301 https://www.cadmus-corp.lab$request_uri;
           }
 
           # ----------------------------------------------------------
@@ -708,7 +708,7 @@
           server {
               listen 443 ssl;
               listen [::]:443 ssl;
-              server_name www.cadmus-corp.test;
+              server_name www.cadmus-corp.lab;
 
               root /var/www/cadmus-www;
               index index.html;
@@ -731,7 +731,7 @@
           server {
               listen 443 ssl;
               listen [::]:443 ssl;
-              server_name portal.cadmus-corp.test;
+              server_name portal.cadmus-corp.lab;
 
               root /var/www/cadmus-portal;
               index index.html;
@@ -754,7 +754,7 @@
           server {
               listen 443 ssl;
               listen [::]:443 ssl;
-              server_name partners.cadmus-corp.test;
+              server_name partners.cadmus-corp.lab;
 
               root /var/www/cadmus-partners;
               index index.html;
@@ -794,7 +794,7 @@
           server {
               listen 8443 ssl;
               listen [::]:8443 ssl;
-              server_name admin.cadmus-corp.test;
+              server_name admin.cadmus-corp.lab;
 
               root /var/www/cadmus-admin;
               index index.html;
@@ -861,7 +861,7 @@
       ansible.builtin.debconf:
         name: postfix
         question: postfix/mailname
-        value: mail.cadmus-corp.test
+        value: mail.cadmus-corp.lab
         vtype: string
 
     - name: Install MAIL01 packages
@@ -876,8 +876,8 @@
     - name: Create MAIL01 TLS certificate
       ansible.builtin.command: >
         openssl req -x509 -nodes -newkey rsa:2048 -days 3650
-        -subj "/CN=mail.cadmus-corp.test/O=CADMUS Corp/OU=Messaging Services"
-        -addext "subjectAltName=DNS:mail.cadmus-corp.test,DNS:smtp.cadmus-corp.test,DNS:imap.cadmus-corp.test"
+        -subj "/CN=mail.cadmus-corp.lab/O=CADMUS Corp/OU=Messaging Services"
+        -addext "subjectAltName=DNS:mail.cadmus-corp.lab,DNS:smtp.cadmus-corp.lab,DNS:imap.cadmus-corp.lab"
         -keyout /etc/ssl/private/mail01.key
         -out /etc/ssl/certs/mail01.crt
       args:
@@ -889,13 +889,13 @@
     - name: Configure Postfix main settings
       ansible.builtin.command: "postconf -e '{{ item }}'"
       loop:
-        - 'myhostname = mail.cadmus-corp.test'
-        - 'mydomain = cadmus-corp.test'
+        - 'myhostname = mail.cadmus-corp.lab'
+        - 'mydomain = cadmus-corp.lab'
         - 'myorigin = $mydomain'
         - 'inet_interfaces = all'
         - 'inet_protocols = ipv4'
         - 'mydestination = $myhostname, localhost.$mydomain, localhost, $mydomain'
-        - 'smtpd_banner = mail.cadmus-corp.test ESMTP Postfix'
+        - 'smtpd_banner = mail.cadmus-corp.lab ESMTP Postfix'
         - 'disable_vrfy_command = no'
         - 'smtpd_tls_cert_file = /etc/ssl/certs/mail01.crt'
         - 'smtpd_tls_key_file = /etc/ssl/private/mail01.key'
@@ -928,7 +928,7 @@
         content: |
           protocols = imap
           listen = *
-          login_greeting = mail.cadmus-corp.test Dovecot ready.
+          login_greeting = mail.cadmus-corp.lab Dovecot ready.
 
           ssl = required
           ssl_cert = </etc/ssl/certs/mail01.crt
@@ -1036,8 +1036,8 @@
     - name: Create VPN01 HTTPS certificate
       ansible.builtin.command: >
         openssl req -x509 -nodes -newkey rsa:2048 -days 3650
-        -subj "/CN=vpn.cadmus-corp.test/O=CADMUS Corp/OU=Remote Access"
-        -addext "subjectAltName=DNS:vpn.cadmus-corp.test,DNS:remote.cadmus-corp.test"
+        -subj "/CN=vpn.cadmus-corp.lab/O=CADMUS Corp/OU=Remote Access"
+        -addext "subjectAltName=DNS:vpn.cadmus-corp.lab,DNS:remote.cadmus-corp.lab"
         -keyout /etc/ssl/private/vpn01.key
         -out /etc/ssl/certs/vpn01.crt
       args:
@@ -1052,7 +1052,7 @@
           server {
               listen 443 ssl default_server;
               listen [::]:443 ssl default_server;
-              server_name vpn.cadmus-corp.test remote.cadmus-corp.test;
+              server_name vpn.cadmus-corp.lab remote.cadmus-corp.lab;
 
               root /var/www/cadmus-vpn;
               index index.html;
@@ -1099,7 +1099,7 @@
 
           conn cadmus-remote-access
               left=%any
-              leftid=@vpn.cadmus-corp.test
+              leftid=@vpn.cadmus-corp.lab
               leftsubnet=10.250.0.0/24
               leftauth=psk
 
@@ -1120,7 +1120,7 @@
         group: root
         mode: '0600'
         content: |
-          @vpn.cadmus-corp.test %any : PSK "CADMUS-External-Lab-PSK-Not-For-Trainee-Use"
+          @vpn.cadmus-corp.lab %any : PSK "CADMUS-External-Lab-PSK-Not-For-Trainee-Use"
       notify: Restart strongSwan
 
     - name: Ensure VPN01 services are running
