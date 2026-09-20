@@ -49,15 +49,15 @@
       "hint_penalty" : 5,
       "order" : 1
     }, {
-      "title" : "Full Sequence for the VPN Host",
-      "content" : "```\nsudo nmap -Pn -sU -p 500,4500 <target_ip>\nsudo ike-scan --ikev2 <target_ip>\nopenssl s_client -connect <target_ip>:443 -servername vpn.cadmus-corp.lab </dev/null 2>/dev/null | \\\n    openssl x509 -noout -subject -ext subjectAltName\n```\nThe SAN field carries the answer.",
-      "hint_penalty" : 10,
-      "order" : 3
-    }, {
       "title" : "Certificates Say More Than You Asked",
       "content" : "A TLS certificate's Common Name is only ever one name among possibly several. Look at the Subject Alternative Name (SAN) field on any certificate you find — especially on services that feel administrative or remote-access-related.\n\nUseful tool: `openssl x509 -noout -subject -ext subjectAltName`, or nmap's `ssl-cert` script.",
       "hint_penalty" : 8,
       "order" : 2
+    }, {
+      "title" : "Full Sequence for the VPN Host",
+      "content" : "```\nsudo nmap -Pn -sU -p 500,4500 <target_ip>\nsudo ike-scan --ikev2 <target_ip>\nopenssl s_client -connect <target_ip>:443 -servername vpn.cadmus-corp.lab </dev/null 2>/dev/null | \\\n    openssl x509 -noout -subject -ext subjectAltName\n```\nThe SAN field carries the answer.",
+      "hint_penalty" : 10,
+      "order" : 3
     } ],
     "incorrect_answer_limit" : 5,
     "attachments" : [ ],
