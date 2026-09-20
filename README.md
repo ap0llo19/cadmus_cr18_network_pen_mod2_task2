@@ -16,7 +16,7 @@ documentation ranges, so nothing here can collide with real address space.
 | --------- | ------------------- | -------------- | ---- |
 | router    | debian-12-x86_64    | 198.51.100.1 / 203.0.113.1 | Forwards between the attacker segment and the DMZ. |
 | pentestvm | ubuntu-noble-x86_64 | 198.51.100.10  | Trainee workstation. |
-| web-gw01  | ubuntu-noble-x86_64 | 203.0.113.5    | nginx on 80/443/8443. Virtual hosts for `www`, `portal`, `partners` and an administration gateway. Two certificates: `*.cadmus-corp.lab` on 443 and `admin.cadmus-corp.lab` (SAN `edge-admin.cadmus-corp.lab`) on 8443. |
+| web-gw01  | ubuntu-noble-x86_64 | 203.0.113.5    | nginx on 80/443/18443. Virtual hosts for `www`, `portal`, `partners` and an administration gateway. Two certificates: `*.cadmus-corp.lab` on 443 and `admin.cadmus-corp.lab` (SAN `edge-admin.cadmus-corp.lab`) on 18443 — deliberately outside nmap's default port set. |
 | mail01    | ubuntu-noble-x86_64 | 203.0.113.9    | Postfix and Dovecot on 25/465/587/993. Everything else is dropped, so it does not answer default host discovery. |
 | vpn01     | ubuntu-noble-x86_64 | 203.0.113.13   | nginx on 443 plus strongSwan IKEv2 on UDP 500/4500. Its certificate is `CN=vpn.cadmus-corp.lab` with `remote.cadmus-corp.lab` in the SAN list. |
 

@@ -20,7 +20,7 @@
 #   VPN01       203.0.113.13    nginx + strongSwan VPN gateway
 #
 # Intended public attack surface:
-#   WEB-GW01    80/tcp, 443/tcp, 8443/tcp
+#   WEB-GW01    80/tcp, 443/tcp, 18443/tcp
 #   MAIL01      25/tcp, 465/tcp, 587/tcp, 993/tcp
 #   VPN01       443/tcp, 500/udp, 4500/udp
 
@@ -635,11 +635,11 @@
           }
 
           # ----------------------------------------------------------
-          # TCP/8443 - Catch-all
+          # TCP/18443 - Catch-all
           # ----------------------------------------------------------
           server {
-              listen 8443 ssl default_server;
-              listen [::]:8443 ssl default_server;
+              listen 18443 ssl default_server;
+              listen [::]:18443 ssl default_server;
               server_name _;
 
               ssl_certificate /etc/ssl/certs/cadmus-admin.crt;
@@ -652,11 +652,11 @@
           }
 
           # ----------------------------------------------------------
-          # TCP/8443 - Administration gateway
+          # TCP/18443 - Administration gateway
           # ----------------------------------------------------------
           server {
-              listen 8443 ssl;
-              listen [::]:8443 ssl;
+              listen 18443 ssl;
+              listen [::]:18443 ssl;
               server_name admin.cadmus-corp.lab;
 
               root /var/www/cadmus-admin;
@@ -1035,7 +1035,7 @@
 
           /usr/sbin/iptables -w 10 -I INPUT 1 -i "$PUB_IF" -j CADMUS_EXT
           /usr/sbin/iptables -w 10 -A CADMUS_EXT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
-          /usr/sbin/iptables -w 10 -A CADMUS_EXT -p tcp -m multiport --dports 80,443,8443 -j ACCEPT
+          /usr/sbin/iptables -w 10 -A CADMUS_EXT -p tcp -m multiport --dports 80,443,18443 -j ACCEPT
           /usr/sbin/iptables -w 10 -A CADMUS_EXT -p icmp --icmp-type echo-request -j DROP
           /usr/sbin/iptables -w 10 -A CADMUS_EXT -j DROP
 

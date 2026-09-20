@@ -181,7 +181,7 @@
       } ]
     }, {
       "question_type" : "FFQ",
-      "text" : "203.0.113.5 also serves TCP/8443. What alternate management hostname does that certificate's SAN field disclose?",
+      "text" : "Beyond 80 and 443, 203.0.113.5 serves one further TLS port. What alternate management hostname does the certificate on that port disclose in its SAN field?",
       "points" : 5,
       "penalty" : 0,
       "order" : 5,
