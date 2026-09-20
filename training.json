@@ -18,7 +18,7 @@
     "estimated_duration" : 0,
     "minimal_possible_solve_time" : null,
     "passkey" : "start-training",
-    "cloud_content" : "In the topology panel on the right, right-click **pentestvm** and select **Open Console**. Log in with username **pentester** and password **pentester**.\n\n\nOnce you're connected, submit the passkey **start-training** to unlock the next level.",
+    "cloud_content" : "In the topology panel on the right, right-click **pentestvm** and select **Open Console**. Log in with username **user** and password **Password123**.\n\n\nOnce you're connected, submit the passkey **start-training** to unlock the next level.",
     "local_content" : "This sandbox has not been validated for local-only deployment."
   }, {
     "title" : "Background — external scanning tools",

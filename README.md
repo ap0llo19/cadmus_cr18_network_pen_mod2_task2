@@ -32,7 +32,7 @@ host:
 - **router** — enables IPv4 forwarding and installs it persistently.
 - **pentestvm** — installs the external scanning toolset, adds a persistent
   route to the DMZ, stages a virtual-host wordlist, and provisions the trainee
-  login `pentester` / `pentester` (sudo) via the `user-access` role.
+  login `user` / `Password123` (sudo) via the `user-access` role.
 - **targets** — add a return route to the attacker segment, then deploy their
   services and an iptables ruleset that exposes only the intended ports.
 
@@ -41,7 +41,7 @@ interface at boot from the route table.
 
 ## Trainee workflow
 
-1. Console into **pentestvm** as `pentester` / `pentester`.
+1. Console into **pentestvm** as `user` / `Password123`.
 2. Work out which gateway carries traffic to `203.0.113.0/28`.
 3. Sweep the range. It will not show every host — one target permits only its
    own service ports and drops discovery probes, so it has to be found by
