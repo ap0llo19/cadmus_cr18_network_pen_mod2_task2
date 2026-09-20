@@ -31,7 +31,7 @@
     "title" : "Map the Perimeter",
     "level_type" : "TRAINING_LEVEL",
     "order" : 3,
-    "estimated_duration" : 25,
+    "estimated_duration" : 30,
     "minimal_possible_solve_time" : 12,
     "answer" : "remote.cadmus-corp.lab",
     "answer_variable_name" : null,
@@ -294,6 +294,6 @@
     "minimal_possible_solve_time" : null,
     "content" : "You've completed the External Network Reconnaissance & Enumeration lab. Starting from a single /28 range and nothing else, you worked out your own routing path, adapted when host discovery was filtered, scanned past the defaults to find services on unusual ports, and correlated certificate metadata across three hosts to surface a hostname the client never intended to expose. This is exactly how a real external assessment starts — not with a target list, but with a range and the discipline to check everything twice. Head back to the LMS to continue the course."
   } ],
-  "estimated_duration" : 39,
+  "estimated_duration" : 44,
   "variant_sandboxes" : false
 }
