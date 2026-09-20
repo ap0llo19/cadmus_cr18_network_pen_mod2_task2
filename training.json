@@ -33,10 +33,10 @@
     "order" : 3,
     "estimated_duration" : 25,
     "minimal_possible_solve_time" : 12,
-    "answer" : "remote.cadmus-corp.test",
+    "answer" : "remote.cadmus-corp.lab",
     "answer_variable_name" : null,
     "content" : "All you have is the range: `203.0.113.0/28`. Everything else is yours to find.\n\nYour objectives for this level:\n\n* Work out which gateway your traffic actually uses to reach that range.\n* Sweep the range for live hosts.\n\n*Note: if a standard sweep comes back with nothing, don't assume the range is empty — reconsider whether you're relying on something that might be filtered.*\n\n* Once you have live hosts, scan each one thoroughly — not just the handful of ports a default scan checks. Services sometimes sit on ports nobody expects to look at.\n* One of the hosts you find runs a VPN service. Fingerprint it, then inspect whatever TLS certificate it presents. Certificates often disclose more hostnames than the one you connected with.\n\nSubmit the **alternate hostname disclosed in that VPN host's TLS certificate** as your answer for this stage.\n\n*Note: the knowledge-check after this level draws on findings from every host you scan, not just the VPN endpoint — cover the whole range, not just enough to find the flag.*",
-    "solution" : "* Check your route — `ip route get 203.0.113.5` → traffic goes via gateway 198.51.100.1.\n* Sweep the range — `sudo nmap -sn 203.0.113.0/28` → depending on filtering this may return little or nothing; ICMP-based discovery is filtered on this range.\n* Rescan without relying on host discovery — `nmap -Pn -p 80,443 <candidate_ip>` for addresses in the range → 5 hosts respond once -Pn is used.\n* Scan each live host for service details: `sudo nmap -Pn -sV -sC <ip>`. One host (203.0.113.13) shows TCP/443 plus UDP/500 and UDP/4500 — a VPN gateway.\n* Inspect its HTTPS certificate for disclosed names:\n```\nopenssl s_client -connect 203.0.113.13:443 -servername vpn.cadmus-corp.test </dev/null 2>/dev/null | \\\n    openssl x509 -noout -subject -ext subjectAltName\n```\nThe CN is `vpn.cadmus-corp.test`; the SAN list additionally discloses `remote.cadmus-corp.test`.\n\n**Answer: remote.cadmus-corp.test**",
+    "solution" : "* Check your route — `ip route get 203.0.113.5` → traffic goes via gateway 198.51.100.1.\n* Sweep the range — `sudo nmap -sn 203.0.113.0/28` → depending on filtering this may return little or nothing; ICMP-based discovery is filtered on this range.\n* Rescan without relying on host discovery — `nmap -Pn -p 80,443 <candidate_ip>` for addresses in the range → 5 hosts respond once -Pn is used.\n* Scan each live host for service details: `sudo nmap -Pn -sV -sC <ip>`. One host (203.0.113.13) shows TCP/443 plus UDP/500 and UDP/4500 — a VPN gateway.\n* Inspect its HTTPS certificate for disclosed names:\n```\nopenssl s_client -connect 203.0.113.13:443 -servername vpn.cadmus-corp.lab </dev/null 2>/dev/null | \\\n    openssl x509 -noout -subject -ext subjectAltName\n```\nThe CN is `vpn.cadmus-corp.lab`; the SAN list additionally discloses `remote.cadmus-corp.lab`.\n\n**Answer: remote.cadmus-corp.lab**",
     "solution_penalized" : true,
     "hints" : [ {
       "title" : "Trust Nothing That Comes Back Empty",
@@ -50,7 +50,7 @@
       "order" : 1
     }, {
       "title" : "Full Sequence for the VPN Host",
-      "content" : "```\nsudo nmap -Pn -sU -p 500,4500 <target_ip>\nsudo ike-scan --ikev2 <target_ip>\nopenssl s_client -connect <target_ip>:443 -servername vpn.cadmus-corp.test </dev/null 2>/dev/null | \\\n    openssl x509 -noout -subject -ext subjectAltName\n```\nThe SAN field carries the answer.",
+      "content" : "```\nsudo nmap -Pn -sU -p 500,4500 <target_ip>\nsudo ike-scan --ikev2 <target_ip>\nopenssl s_client -connect <target_ip>:443 -servername vpn.cadmus-corp.lab </dev/null 2>/dev/null | \\\n    openssl x509 -noout -subject -ext subjectAltName\n```\nThe SAN field carries the answer.",
       "hint_penalty" : 10,
       "order" : 3
     }, {
@@ -227,11 +227,11 @@
       "order" : 7,
       "answer_required" : true,
       "choices" : [ {
-        "text" : "mail.cadmus-corp.test",
+        "text" : "mail.cadmus-corp.lab",
         "correct" : true,
         "order" : 0
       }, {
-        "text" : "MAIL.CADMUS-CORP.TEST",
+        "text" : "MAIL.CADMUS-CORP.LAB",
         "correct" : true,
         "order" : 1
       } ]
