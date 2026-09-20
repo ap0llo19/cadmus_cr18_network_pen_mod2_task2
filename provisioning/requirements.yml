@@ -3,6 +3,3 @@ roles:
     src: https://github.com/cyberrangecz/ansible-role-user-access
     scm: git
     version: v1.0.0
-
-collections:
-  - name: ansible.windows
