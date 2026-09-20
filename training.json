@@ -83,7 +83,7 @@
       "question_type" : "FFQ",
       "text" : "What gateway does your traffic use to reach 203.0.113.0/28?",
       "points" : 5,
-      "penalty" : 3,
+      "penalty" : 0,
       "order" : 0,
       "answer_required" : true,
       "choices" : [ {
@@ -119,7 +119,7 @@
       "question_type" : "MCQ",
       "text" : "Which nmap option lets you scan a target without relying on host discovery?",
       "points" : 5,
-      "penalty" : 5,
+      "penalty" : 0,
       "order" : 2,
       "answer_required" : true,
       "choices" : [ {
@@ -143,7 +143,7 @@
       "question_type" : "MCQ",
       "text" : "What web-server software is exposed on 203.0.113.5's web ports?",
       "points" : 5,
-      "penalty" : 5,
+      "penalty" : 0,
       "order" : 3,
       "answer_required" : true,
       "choices" : [ {
@@ -199,7 +199,7 @@
       "question_type" : "MCQ",
       "text" : "Which TCP port on 203.0.113.9 is used for SMTP Submission?",
       "points" : 5,
-      "penalty" : 3,
+      "penalty" : 0,
       "order" : 6,
       "answer_required" : true,
       "choices" : [ {
@@ -239,7 +239,7 @@
       "question_type" : "MCQ",
       "text" : "Which version of IKE does 203.0.113.13 present on UDP/500?",
       "points" : 5,
-      "penalty" : 2,
+      "penalty" : 0,
       "order" : 8,
       "answer_required" : true,
       "choices" : [ {
@@ -263,7 +263,7 @@
       "question_type" : "MCQ",
       "text" : "Which service does nmap identify on 203.0.113.13's UDP/500?",
       "points" : 5,
-      "penalty" : 5,
+      "penalty" : 0,
       "order" : 9,
       "answer_required" : true,
       "choices" : [ {
