@@ -29,7 +29,7 @@
 # Common Linux baseline
 # ----------------------------------------------------------------------------
 - name: Common baseline for external lab Linux machines
-  hosts: pentestvm:web-gw01:mail01:vpn01
+  hosts: pentestvm:web-gw01:mail01:vpn01:router
   become: true
   gather_facts: true
 
