@@ -1016,7 +1016,14 @@
           #!/bin/sh
           set -eu
 
-          PUB_IF="$(/usr/sbin/ip route get 203.0.113.1 2>/dev/null | awk '{for (i=1; i<=NF; i++) if ($i=="dev") {print $(i+1); exit}}')"
+          PUB_IF=""
+          for i in $(seq 1 30); do
+              PUB_IF="$(/usr/sbin/ip route get 203.0.113.1 2>/dev/null | awk '{for (i=1; i<=NF; i++) if ($i=="dev") {print $(i+1); exit}}')"
+              if [ -n "$PUB_IF" ]; then
+                  break
+              fi
+              sleep 1
+          done
           [ -n "$PUB_IF" ] || { echo "Unable to determine public DMZ interface" >&2; exit 1; }
 
           /usr/sbin/iptables -w 10 -N CADMUS_EXT 2>/dev/null || true
@@ -1072,7 +1079,14 @@
           #!/bin/sh
           set -eu
 
-          PUB_IF="$(/usr/sbin/ip route get 203.0.113.1 2>/dev/null | awk '{for (i=1; i<=NF; i++) if ($i=="dev") {print $(i+1); exit}}')"
+          PUB_IF=""
+          for i in $(seq 1 30); do
+              PUB_IF="$(/usr/sbin/ip route get 203.0.113.1 2>/dev/null | awk '{for (i=1; i<=NF; i++) if ($i=="dev") {print $(i+1); exit}}')"
+              if [ -n "$PUB_IF" ]; then
+                  break
+              fi
+              sleep 1
+          done
           [ -n "$PUB_IF" ] || { echo "Unable to determine public DMZ interface" >&2; exit 1; }
 
           /usr/sbin/iptables -w 10 -N CADMUS_EXT 2>/dev/null || true
@@ -1128,7 +1142,14 @@
           #!/bin/sh
           set -eu
 
-          PUB_IF="$(/usr/sbin/ip route get 203.0.113.1 2>/dev/null | awk '{for (i=1; i<=NF; i++) if ($i=="dev") {print $(i+1); exit}}')"
+          PUB_IF=""
+          for i in $(seq 1 30); do
+              PUB_IF="$(/usr/sbin/ip route get 203.0.113.1 2>/dev/null | awk '{for (i=1; i<=NF; i++) if ($i=="dev") {print $(i+1); exit}}')"
+              if [ -n "$PUB_IF" ]; then
+                  break
+              fi
+              sleep 1
+          done
           [ -n "$PUB_IF" ] || { echo "Unable to determine public DMZ interface" >&2; exit 1; }
 
           /usr/sbin/iptables -w 10 -N CADMUS_EXT 2>/dev/null || true
