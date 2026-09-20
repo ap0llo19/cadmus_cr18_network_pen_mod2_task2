@@ -93,14 +93,14 @@
       } ]
     }, {
       "question_type" : "MCQ",
-      "text" : "Excluding the gateway, how many hosts did you find in 203.0.113.0/28 once you scanned past filtered discovery?",
+      "text" : "How many addresses in 203.0.113.0/28 reply once you scan past filtered discovery, counting every reply including the gateway?",
       "points" : 5,
       "penalty" : 0,
       "order" : 1,
       "answer_required" : true,
       "choices" : [ {
         "text" : "3",
-        "correct" : true,
+        "correct" : false,
         "order" : 0
       }, {
         "text" : "4",
@@ -108,7 +108,7 @@
         "order" : 1
       }, {
         "text" : "5",
-        "correct" : false,
+        "correct" : true,
         "order" : 2
       }, {
         "text" : "7",
