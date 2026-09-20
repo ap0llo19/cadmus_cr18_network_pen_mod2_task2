@@ -50,8 +50,9 @@
 
     - name: Wait for any apt/dpkg lock to release
       ansible.builtin.shell: >
-        while fuser /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock
-        /var/cache/apt/archives/lock /var/lib/dpkg/lock >/dev/null 2>&1; do sleep 3; done
+        timeout 300 sh -c 'while fuser /var/lib/dpkg/lock-frontend
+        /var/lib/apt/lists/lock /var/cache/apt/archives/lock
+        /var/lib/dpkg/lock >/dev/null 2>&1; do sleep 3; done'
       changed_when: false
       failed_when: false
 
