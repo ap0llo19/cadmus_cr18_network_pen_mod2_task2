@@ -16,8 +16,8 @@
 #   router      198.51.100.1    attacker-side gateway
 #   router      203.0.113.1     public-DMZ gateway
 #   WEB-GW01    203.0.113.5     nginx web gateway
-#   MAIL01      203.0.113.6     Postfix/Dovecot mail gateway
-#   VPN01       203.0.113.7     nginx + strongSwan VPN gateway
+#   MAIL01      203.0.113.9     Postfix/Dovecot mail gateway
+#   VPN01       203.0.113.13    nginx + strongSwan VPN gateway
 #
 # Intended public attack surface:
 #   WEB-GW01    80/tcp, 443/tcp, 8443/tcp
