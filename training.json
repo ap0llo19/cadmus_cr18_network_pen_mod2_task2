@@ -1,0 +1,404 @@
+{
+  "title": "CR-18 / Module 2 / N2d — External Network Enumeration",
+  "description": "Route into a client's public /28 from an external vantage point, find the host a standard sweep cannot see, and work the perimeter for what its services disclose about themselves — a port outside the scanned range, hostnames leaked in certificates, and a VPN that only answers over UDP. Concludes with a short knowledge check.",
+  "prerequisites": [
+    "Comfort using a Linux shell",
+    "Basic familiarity with TCP/IP networking (routing, ports, common services)",
+    "No prior nmap, openssl, ffuf, or ike-scan experience required — covered in the background level"
+  ],
+  "outcomes": [
+    "Determine the routing path to an external assessment range",
+    "Distinguish a host that fails discovery from an address that is genuinely unused",
+    "Scan beyond the default port range and beyond TCP",
+    "Extract hostnames from TLS certificates, including Subject Alternative Names",
+    "Fingerprint mail and IPsec services from what they disclose on connection"
+  ],
+  "state": "UNRELEASED",
+  "levels": [
+    {
+      "title": "Introduction level",
+      "level_type": "INFO_LEVEL",
+      "order": 0,
+      "estimated_duration": 0,
+      "minimal_possible_solve_time": null,
+      "content": "Welcome to the External Network Reconnaissance & Enumeration lab.\n\nCADMUS Corp has commissioned an external perimeter assessment. All you have been given is a single fact: their public assessment range is `203.0.113.0/28`. No host list, no service map — you are working from the outside in, exactly as an attacker would.\n\nYou will work out how traffic even reaches that range, then find that a normal sweep does not show you everything on it. From there the lab is about what services say about themselves when you ask properly: a port outside the range anyone scans, certificates that name hosts their owners never meant to publish, a VPN that only answers the right kind of question, and a mail server that introduces itself by name.\n\nA short knowledge check at the end covers what your scans showed you along the way. Two background levels give you the tool syntax — one before you go looking, one before you start interrogating. Allow roughly 50 minutes."
+    },
+    {
+      "title": "Get Access",
+      "level_type": "ACCESS_LEVEL",
+      "order": 1,
+      "estimated_duration": 0,
+      "minimal_possible_solve_time": null,
+      "passkey": "start-training",
+      "cloud_content": "Open the Kali desktop on **pentestvm** and log in.\n\n1. In the topology overview on the right, right-click on **`pentestvm`** and choose **`Open GUI`** (or **`Open GUI In New Window`** if you prefer a separate window). The Kali display manager loads in your browser.\n2. Log in with username **`user`** and password **`Password123`**.\n3. Open a terminal from the desktop.\n\nIf you prefer SSH, the setup is documented at https://docs.platform.cyberrange.cz/user-guide-advanced/sandboxes/sandbox-access/#user-access. SSH makes copy-paste easier but takes a few minutes to configure.\n\nWhen you are in, submit **`start-training`** to unlock the next level.",
+      "local_content": "This sandbox has not been validated for local-only deployment."
+    },
+    {
+      "title": "Background — reaching the range",
+      "level_type": "INFO_LEVEL",
+      "order": 2,
+      "estimated_duration": 3,
+      "minimal_possible_solve_time": null,
+      "content": "You have been given a range and nothing else. This level covers getting to it and finding what is on it. Interrogating what you find comes later, with its own background level.\n\n## Getting there\n\n    ip addr                                # your own interfaces\n    ip route get <target_ip>               # which gateway carries traffic to a target\n\n## Finding what is on it\n\n    sudo nmap -sn <range>                  # host discovery: ICMP echo plus TCP probes to 443 and 80\n    sudo nmap -Pn -p <ports> <target_ip>   # skip discovery entirely and scan regardless\n\n`-sn` decides a host is up if *any* of its probes gets an answer. A host that permits only its own service ports, and drops everything else, answers none of them and is reported down. It is still there. `-Pn` stops nmap asking the question at all and simply scans the address.\n\nRun these with `sudo`. Unprivileged scans fall back to TCP connect and lose both the ARP and the raw-probe behaviour."
+    },
+    {
+      "title": "Reach what you cannot see",
+      "level_type": "TRAINING_LEVEL",
+      "order": 3,
+      "estimated_duration": 10,
+      "minimal_possible_solve_time": 3,
+      "answer": "203.0.113.9",
+      "answer_variable_name": null,
+      "content": "Start with the range and nothing else: `203.0.113.0/28`.\n\nWork out how your traffic gets there, then sweep it and take stock of what answers. Then look at the size of the range against the number of replies you got, and satisfy yourself that the gap is empty — because it is not.\n\nOne address on this range hosts a live, fully configured service and still does not answer a standard sweep.\n\nSubmit **the IP address of that host**.",
+      "solution": "* `ip route get 203.0.113.5` → traffic leaves via the gateway on your own segment, `198.51.100.1`.\n* `sudo nmap -sn 203.0.113.0/28` → four addresses answer: the DMZ gateway at `.1`, an address belonging to the platform itself at `.2`, the web gateway at `.5`, and the VPN endpoint at `.13`. The last two answer because they permit tcp/80 and tcp/443, which is exactly what `-sn` probes.\n* A `/28` is sixteen addresses and you have four, only two of which are client systems. Scan the rest without relying on discovery: `sudo nmap -Pn -p 25,80,443,587 203.0.113.0/28`.\n* `203.0.113.9` answers on tcp/25 and tcp/587. It permits only its own mail ports and drops everything else, so the sweep never saw it.\n\n**Answer: 203.0.113.9**",
+      "solution_penalized": true,
+      "hints": [
+        {
+          "title": "Count Against The Range",
+          "content": "A `/28` holds sixteen addresses. Compare that against the number of replies your sweep produced. If the two do not account for each other, the difference is not proof of absence — it is where you have not looked yet.",
+          "hint_penalty": 5,
+          "order": 0
+        },
+        {
+          "title": "Stop Asking, Just Scan",
+          "content": "`-sn` reports a host down when none of its probes are answered, which is not the same as the host being absent. `-Pn` skips discovery and scans the address anyway.\n\nTry `sudo nmap -Pn -p 25,80,443,587 203.0.113.0/28` and watch which address turns up that the sweep missed.",
+          "hint_penalty": 8,
+          "order": 1
+        }
+      ],
+      "incorrect_answer_limit": 5,
+      "attachments": [],
+      "max_score": 30,
+      "variant_answers": false,
+      "reference_solution": [],
+      "mitre_techniques": [
+        {
+          "technique_key": "TA0043.T1590"
+        },
+        {
+          "technique_key": "TA0043.T1595"
+        }
+      ],
+      "expected_commands": [
+        "ip",
+        "nmap"
+      ],
+      "commands_required": false
+    },
+    {
+      "title": "Background — interrogating the edge",
+      "level_type": "INFO_LEVEL",
+      "order": 4,
+      "estimated_duration": 4,
+      "minimal_possible_solve_time": null,
+      "content": "You have your hosts. Now make them tell you about themselves.\n\n## Fingerprinting\n\n    sudo nmap -Pn -sV -sC <target_ip>      # versions + default scripts\n    sudo nmap -Pn -p- <target_ip>          # every TCP port, not just the top 1000\n    sudo nmap -Pn -sU -p <ports> <ip>      # UDP, which a TCP scan never touches\n\nA default scan checks nmap's top 1000 ports. A service deliberately moved outside that set will not appear at all until you scan the full range.\n\n## Certificates\n\n    openssl s_client -connect <ip>:<port> </dev/null 2>/dev/null | \\\n        openssl x509 -noout -subject -ext subjectAltName\n\nThe Common Name is one name the certificate is valid for. The Subject Alternative Name list holds *every* name — including, often, ones whose owners never intended them to be public.\n\nYou have a desktop, so the browser works just as well: open `https://<ip>:<port>/`, accept the warning, then click the padlock and follow through to the certificate details. The Subject Alt Names are listed there in full.\n\n## VPN endpoints\n\n    sudo ike-scan --ikev2 --dhgroup=14 <target_ip>\n\nA gateway that only accepts certain Diffie-Hellman groups will reject ike-scan's default proposal with `INVALID_KE_PAYLOAD`. That is a refused proposal, not an absent VPN — try another group rather than concluding nothing is there.\n\n## Banners and virtual hosts\n\n    nc <target_ip> 25                      # read what a service says on connect\n    swaks --server <target_ip> --quit-after BANNER\n\n    ffuf -w <wordlist> -u https://<ip>:<port>/ -H 'Host: FUZZ.cadmus-corp.lab'\n\nA candidate virtual-host wordlist is staged for you at `~/Desktop/module2-external/vhosts.txt`."
+    },
+    {
+      "title": "The port nobody scans",
+      "level_type": "TRAINING_LEVEL",
+      "order": 5,
+      "estimated_duration": 10,
+      "minimal_possible_solve_time": 3,
+      "answer": "edge-admin.cadmus-corp.lab",
+      "answer_variable_name": null,
+      "content": "The web gateway on this perimeter serves the company's public sites. It also serves something that is not meant to be public, on a port chosen to sit outside the range a normal scan bothers with.\n\nFind that port, look at the certificate it presents, and read the names on it. The certificate is valid for more than one host, and one of those names describes a system that should never have been reachable from outside at all.\n\nSubmit **the alternate management hostname** the certificate discloses.",
+      "solution": "* A default scan of `203.0.113.5` shows tcp/80 and tcp/443 only. Scan the full range: `sudo nmap -Pn -p- 203.0.113.5` → tcp/18443 is also open, well outside nmap's top 1000.\n* Inspect what it presents:\n\n```\nopenssl s_client -connect 203.0.113.5:18443 </dev/null 2>/dev/null | \\\n    openssl x509 -noout -subject -ext subjectAltName\n```\n\n* The Common Name is `admin.cadmus-corp.lab`. The SAN list adds `edge-admin.cadmus-corp.lab` — a second name for the same gateway, and the one that gives away an internal-facing administration endpoint.\n* Fuzzing the `Host:` header against that port with the staged wordlist turns up `admin.cadmus-corp.lab`, which confirms what the gateway is for. It will not turn up the answer: `edge-admin` is not in the wordlist, and nginx only routes `admin` there. That name exists nowhere on the perimeter except inside the certificate — which is exactly why certificates are worth reading.\n\n**Answer: edge-admin.cadmus-corp.lab**",
+      "solution_penalized": true,
+      "hints": [
+        {
+          "title": "Outside The Top Thousand",
+          "content": "`nmap` scans its top 1000 ports unless told otherwise, and a service placed deliberately out of the way will simply not appear. `sudo nmap -Pn -p- <target_ip>` covers all 65535.\n\nThese hosts drop unwanted traffic rather than refusing it, so nmap waits out a timeout on every closed port. Use `--min-rate 2000`: with it the scan takes well under two minutes, without it expect to be waiting half an hour.",
+          "hint_penalty": 5,
+          "order": 0
+        },
+        {
+          "title": "Read The Whole Certificate",
+          "content": "Once you have the port, ask what certificate it serves and look past the Common Name. The Subject Alternative Name list carries every hostname the certificate covers.\n\n`openssl s_client -connect <ip>:<port> </dev/null 2>/dev/null | openssl x509 -noout -subject -ext subjectAltName`",
+          "hint_penalty": 8,
+          "order": 1
+        }
+      ],
+      "incorrect_answer_limit": 5,
+      "attachments": [],
+      "max_score": 30,
+      "variant_answers": false,
+      "reference_solution": [],
+      "mitre_techniques": [
+        {
+          "technique_key": "TA0043.T1595"
+        },
+        {
+          "technique_key": "TA0043.T1592"
+        }
+      ],
+      "expected_commands": [
+        "nmap",
+        "openssl"
+      ],
+      "commands_required": false
+    },
+    {
+      "title": "What the certificate gives away",
+      "level_type": "TRAINING_LEVEL",
+      "order": 6,
+      "estimated_duration": 6,
+      "minimal_possible_solve_time": 2,
+      "answer": "remote.cadmus-corp.lab",
+      "answer_variable_name": null,
+      "content": "One host on this perimeter is a VPN endpoint. It answers on tcp/443 like an ordinary web server, and the certificate it serves there is the most talkative thing on the whole range.\n\nIts Common Name is the name you would expect. The Subject Alternative Name list is not.\n\nSubmit **the alternate hostname** disclosed in that host's certificate.",
+      "solution": "* `203.0.113.13` shows tcp/443 open. Ask it for its certificate:\n\n```\nopenssl s_client -connect 203.0.113.13:443 -servername vpn.cadmus-corp.lab </dev/null 2>/dev/null | \\\n    openssl x509 -noout -subject -ext subjectAltName\n```\n\n* The Common Name is `vpn.cadmus-corp.lab` — unremarkable for a VPN gateway.\n* The SAN list also carries `remote.cadmus-corp.lab`. Nothing else on the perimeter references that name; the certificate is the only place it leaks.\n\n**Answer: remote.cadmus-corp.lab**",
+      "solution_penalized": true,
+      "hints": [
+        {
+          "title": "The CN Is Not The Whole Story",
+          "content": "A certificate's Common Name is only one of the names it is valid for. The Subject Alternative Name extension lists all of them, and it is routinely populated with internal names nobody thought about before publishing.",
+          "hint_penalty": 5,
+          "order": 0
+        },
+        {
+          "title": "Ask For The Extension",
+          "content": "`openssl x509 -noout -subject` alone gives you the CN and stops. Add `-ext subjectAltName` to see the rest.\n\n`openssl s_client -connect <ip>:443 </dev/null 2>/dev/null | openssl x509 -noout -subject -ext subjectAltName`",
+          "hint_penalty": 8,
+          "order": 1
+        }
+      ],
+      "incorrect_answer_limit": 5,
+      "attachments": [],
+      "max_score": 30,
+      "variant_answers": false,
+      "reference_solution": [],
+      "mitre_techniques": [
+        {
+          "technique_key": "TA0043.T1592"
+        }
+      ],
+      "expected_commands": [
+        "openssl"
+      ],
+      "commands_required": false
+    },
+    {
+      "title": "Beyond TCP",
+      "level_type": "TRAINING_LEVEL",
+      "order": 7,
+      "estimated_duration": 8,
+      "minimal_possible_solve_time": 2,
+      "answer": "isakmp",
+      "answer_variable_name": null,
+      "content": "Every scan you have run so far has been TCP. Plenty of infrastructure does not live there at all, and a TCP-only assessment of a perimeter will miss it entirely — including, on this range, most of what the VPN endpoint actually does.\n\nScan the VPN endpoint at **`203.0.113.13`** over UDP and see what it is really running.\n\nScan **only ports 500 and 4500**. A UDP scan has to wait out a timeout on every port that does not answer, so a broad one against a host that drops traffic will still be running long after you have lost interest. Narrow it before you start.\n\nSubmit **the service name nmap reports for UDP/500**.",
+      "solution": "* `sudo nmap -Pn -sU -p 500,4500 203.0.113.13` → both are open. nmap names UDP/500 **isakmp**, the key-exchange protocol every IPsec VPN negotiates over, and UDP/4500 is the NAT-traversal companion.\n* Confirm what is behind it: `sudo ike-scan --ikev2 --dhgroup=14 203.0.113.13`. The gateway only accepts modp2048, so ike-scan's default proposal is refused with `INVALID_KE_PAYLOAD` — group 14 is the one it will negotiate.\n* Note that none of this appears in any TCP scan, however thorough. The host looked like a plain web server until you scanned the other protocol.\n\n**Answer: isakmp**",
+      "solution_penalized": true,
+      "hints": [
+        {
+          "title": "A Whole Protocol You Have Not Scanned",
+          "content": "Everything so far has been TCP. UDP is a separate scan and nmap does not do it unless asked: `-sU`. Keep the port range narrow, because UDP scanning is slow.\n\nFor a VPN, the ports worth trying are 500 and 4500.",
+          "hint_penalty": 5,
+          "order": 0
+        },
+        {
+          "title": "What nmap Calls It",
+          "content": "Run `sudo nmap -Pn -sU -p 500,4500 <target_ip>` and read the SERVICE column for port 500. That is the answer — the protocol name, not the product.",
+          "hint_penalty": 8,
+          "order": 1
+        }
+      ],
+      "incorrect_answer_limit": 5,
+      "attachments": [],
+      "max_score": 30,
+      "variant_answers": false,
+      "reference_solution": [],
+      "mitre_techniques": [
+        {
+          "technique_key": "TA0043.T1595"
+        }
+      ],
+      "expected_commands": [
+        "nmap",
+        "ike-scan"
+      ],
+      "commands_required": false
+    },
+    {
+      "title": "Mail, in its own words",
+      "level_type": "TRAINING_LEVEL",
+      "order": 8,
+      "estimated_duration": 6,
+      "minimal_possible_solve_time": 2,
+      "answer": "mail.cadmus-corp.lab",
+      "answer_variable_name": null,
+      "content": "The host your sweep could not see is a mail gateway. Mail services are unusually forthcoming: connect to one and it will greet you, unprompted, with the name it believes it has.\n\nThat name is not necessarily the address you connected to, and it is not always one the organisation publishes.\n\nConnect to its SMTP service and submit **the hostname it announces in its greeting**.",
+      "solution": "* `203.0.113.9` permits tcp/25, 465, 587 and 993 — the host `-sn` could not see.\n* Connect and read the greeting: `nc 203.0.113.9 25`\n\n  The server answers with a `220` line before you send anything, and that line begins with the hostname it identifies as: `mail.cadmus-corp.lab`.\n\n* `swaks --server 203.0.113.9 --quit-after BANNER` does the same thing without holding the session open. Type `QUIT` to leave a raw `nc` session.\n\n**Answer: mail.cadmus-corp.lab**",
+      "solution_penalized": true,
+      "hints": [
+        {
+          "title": "Let It Introduce Itself",
+          "content": "SMTP servers send a `220` greeting the moment you connect, before any command. You do not need to authenticate or send anything to read it — just open the connection and look.\n\n`nc <target_ip> 25`",
+          "hint_penalty": 5,
+          "order": 0
+        },
+        {
+          "title": "The Name Is In The Greeting",
+          "content": "The greeting line looks like `220 <hostname> ESMTP <product>`. The hostname is the part immediately after the `220`, and it is what the server believes it is called rather than what you dialled.\n\n`swaks --server <target_ip> --quit-after BANNER` prints it and exits cleanly.",
+          "hint_penalty": 8,
+          "order": 1
+        }
+      ],
+      "incorrect_answer_limit": 5,
+      "attachments": [],
+      "max_score": 30,
+      "variant_answers": false,
+      "reference_solution": [],
+      "mitre_techniques": [
+        {
+          "technique_key": "TA0043.T1592"
+        }
+      ],
+      "expected_commands": [
+        "nc",
+        "swaks"
+      ],
+      "commands_required": false
+    },
+    {
+      "title": "Knowledge Check",
+      "level_type": "ASSESSMENT_LEVEL",
+      "order": 9,
+      "estimated_duration": 5,
+      "minimal_possible_solve_time": 2,
+      "questions": [
+        {
+          "question_type": "FFQ",
+          "text": "What gateway does your traffic use to reach 203.0.113.0/28?",
+          "points": 10,
+          "penalty": 0,
+          "order": 0,
+          "answer_required": true,
+          "choices": [
+            {
+              "text": "198.51.100.1",
+              "correct": true,
+              "order": 0
+            }
+          ]
+        },
+        {
+          "question_type": "MCQ",
+          "text": "What web-server software is exposed on 203.0.113.5's web ports?",
+          "points": 10,
+          "penalty": 0,
+          "order": 1,
+          "answer_required": true,
+          "choices": [
+            {
+              "text": "nginx",
+              "correct": true,
+              "order": 0
+            },
+            {
+              "text": "Apache httpd",
+              "correct": false,
+              "order": 1
+            },
+            {
+              "text": "lighttpd",
+              "correct": false,
+              "order": 2
+            },
+            {
+              "text": "Microsoft IIS",
+              "correct": false,
+              "order": 3
+            }
+          ]
+        },
+        {
+          "question_type": "FFQ",
+          "text": "What Common Name (CN) is present in the TLS certificate served on 203.0.113.5:443?",
+          "points": 10,
+          "penalty": 0,
+          "order": 2,
+          "answer_required": true,
+          "choices": [
+            {
+              "text": "*.cadmus-corp.lab",
+              "correct": true,
+              "order": 0
+            }
+          ]
+        },
+        {
+          "question_type": "MCQ",
+          "text": "203.0.113.9 exposes three SMTP-speaking ports. Which one does nmap identify as `ssl/smtp` rather than plain `smtp`?",
+          "points": 10,
+          "penalty": 0,
+          "order": 3,
+          "answer_required": true,
+          "choices": [
+            {
+              "text": "465",
+              "correct": true,
+              "order": 0
+            },
+            {
+              "text": "25",
+              "correct": false,
+              "order": 1
+            },
+            {
+              "text": "587",
+              "correct": false,
+              "order": 2
+            },
+            {
+              "text": "993",
+              "correct": false,
+              "order": 3
+            }
+          ]
+        },
+        {
+          "question_type": "MCQ",
+          "text": "Run `sudo ike-scan --ikev2 --dhgroup=14 203.0.113.13`. Which version of IKE does the gateway present on UDP/500?",
+          "points": 10,
+          "penalty": 0,
+          "order": 4,
+          "answer_required": true,
+          "choices": [
+            {
+              "text": "IKEv2",
+              "correct": true,
+              "order": 0
+            },
+            {
+              "text": "IKEv1",
+              "correct": false,
+              "order": 1
+            },
+            {
+              "text": "both IKEv1 and IKEv2",
+              "correct": false,
+              "order": 2
+            },
+            {
+              "text": "neither — it is not an IPsec endpoint",
+              "correct": false,
+              "order": 3
+            }
+          ]
+        }
+      ],
+      "instructions": "Five questions on the perimeter you mapped during the exercise, all answerable from output you have already produced. If you did not keep your results: the gateway comes from `ip route get 203.0.113.5`, or from a `traceroute` to the same address, `sudo nmap -Pn -sV -sC <ip>` against the address in question covers the next three, and `sudo ike-scan --ikev2 --dhgroup=14 203.0.113.13` the last.",
+      "assessment_type": "TEST"
+    },
+    {
+      "title": "Lab Completed",
+      "level_type": "INFO_LEVEL",
+      "order": 10,
+      "estimated_duration": 0,
+      "minimal_possible_solve_time": null,
+      "content": "You've completed the External Network Reconnaissance & Enumeration lab.\n\nStarting from a single `/28` and nothing else, you worked out how to reach it, found a host that a standard sweep insists is not there, found a service parked outside the port range anyone scans, pulled two hostnames out of certificates that were never meant to be public, and found that most of what the VPN endpoint does is not on TCP at all.\n\nEvery one of those came from asking a more careful question than the default. That is the whole of external reconnaissance: the perimeter tells you what you ask it, and the defaults do not ask very much. Head back to the LMS to continue the course."
+    }
+  ],
+  "estimated_duration": 52,
+  "variant_sandboxes": false
+}

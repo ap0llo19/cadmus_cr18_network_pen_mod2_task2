@@ -16,11 +16,11 @@
 #   router      198.51.100.1    attacker-side gateway
 #   router      203.0.113.1     public-DMZ gateway
 #   WEB-GW01    203.0.113.5     nginx web gateway
-#   MAIL01      203.0.113.6     Postfix/Dovecot mail gateway
-#   VPN01       203.0.113.7     nginx + strongSwan VPN gateway
+#   MAIL01      203.0.113.9     Postfix/Dovecot mail gateway
+#   VPN01       203.0.113.13    nginx + strongSwan VPN gateway
 #
 # Intended public attack surface:
-#   WEB-GW01    80/tcp, 443/tcp, 8443/tcp
+#   WEB-GW01    80/tcp, 443/tcp, 18443/tcp
 #   MAIL01      25/tcp, 465/tcp, 587/tcp, 993/tcp
 #   VPN01       443/tcp, 500/udp, 4500/udp
 
@@ -29,7 +29,7 @@
 # Common Linux baseline
 # ----------------------------------------------------------------------------
 - name: Common baseline for external lab Linux machines
-  hosts: pentestvm:web-gw01:mail01:vpn01
+  hosts: pentestvm:web-gw01:mail01:vpn01:router
   become: true
   gather_facts: true
 
@@ -50,8 +50,9 @@
 
     - name: Wait for any apt/dpkg lock to release
       ansible.builtin.shell: >
-        while fuser /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock
-        /var/cache/apt/archives/lock /var/lib/dpkg/lock >/dev/null 2>&1; do sleep 3; done
+        timeout 300 sh -c 'while fuser /var/lib/dpkg/lock-frontend
+        /var/lib/apt/lists/lock /var/cache/apt/archives/lock
+        /var/lib/dpkg/lock >/dev/null 2>&1; do sleep 3; done'
       changed_when: false
       failed_when: false
 
@@ -165,11 +166,20 @@
 
   roles:
     - role: user-access
-      user_access_username: pentester
-      user_access_password: 'pentester'
+      user_access_username: user
+      user_access_password: 'Password123'
       user_access_sudo: true
 
   tasks:
+    # Kali images boot with a stack-prefixed hostname that /etc/hosts does not
+    # resolve, which makes every sudo call emit "unable to resolve host".
+    - name: Ensure /etc/hosts resolves the renamed hostname
+      ansible.builtin.lineinfile:
+        path: /etc/hosts
+        regexp: '^127\.0\.1\.1\b'
+        line: "127.0.1.1 {{ ansible_hostname }}"
+        state: present
+
     - name: Install external scanning and enumeration tools
       ansible.builtin.apt:
         name:
@@ -237,10 +247,10 @@
 
     - name: Create trainee working directories
       ansible.builtin.file:
-        path: "/home/pentester/{{ item }}"
+        path: "/home/user/{{ item }}"
         state: directory
-        owner: pentester
-        group: pentester
+        owner: user
+        group: user
         mode: '0755'
       loop:
         - Desktop
@@ -248,9 +258,9 @@
 
     - name: Add virtual-host candidate wordlist
       ansible.builtin.copy:
-        dest: /home/pentester/Desktop/module2-external/vhosts.txt
-        owner: pentester
-        group: pentester
+        dest: /home/user/Desktop/module2-external/vhosts.txt
+        owner: user
+        group: user
         mode: '0644'
         content: |
           account
@@ -634,11 +644,11 @@
           }
 
           # ----------------------------------------------------------
-          # TCP/8443 - Catch-all
+          # TCP/18443 - Catch-all
           # ----------------------------------------------------------
           server {
-              listen 8443 ssl default_server;
-              listen [::]:8443 ssl default_server;
+              listen 18443 ssl default_server;
+              listen [::]:18443 ssl default_server;
               server_name _;
 
               ssl_certificate /etc/ssl/certs/cadmus-admin.crt;
@@ -651,11 +661,11 @@
           }
 
           # ----------------------------------------------------------
-          # TCP/8443 - Administration gateway
+          # TCP/18443 - Administration gateway
           # ----------------------------------------------------------
           server {
-              listen 8443 ssl;
-              listen [::]:8443 ssl;
+              listen 18443 ssl;
+              listen [::]:18443 ssl;
               server_name admin.cadmus-corp.lab;
 
               root /var/www/cadmus-admin;
@@ -1015,7 +1025,14 @@
           #!/bin/sh
           set -eu
 
-          PUB_IF="$(/usr/sbin/ip route get 203.0.113.1 2>/dev/null | awk '{for (i=1; i<=NF; i++) if ($i=="dev") {print $(i+1); exit}}')"
+          PUB_IF=""
+          for i in $(seq 1 30); do
+              PUB_IF="$(/usr/sbin/ip route get 203.0.113.1 2>/dev/null | awk '{for (i=1; i<=NF; i++) if ($i=="dev") {print $(i+1); exit}}')"
+              if [ -n "$PUB_IF" ]; then
+                  break
+              fi
+              sleep 1
+          done
           [ -n "$PUB_IF" ] || { echo "Unable to determine public DMZ interface" >&2; exit 1; }
 
           /usr/sbin/iptables -w 10 -N CADMUS_EXT 2>/dev/null || true
@@ -1027,7 +1044,7 @@
 
           /usr/sbin/iptables -w 10 -I INPUT 1 -i "$PUB_IF" -j CADMUS_EXT
           /usr/sbin/iptables -w 10 -A CADMUS_EXT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
-          /usr/sbin/iptables -w 10 -A CADMUS_EXT -p tcp -m multiport --dports 80,443,8443 -j ACCEPT
+          /usr/sbin/iptables -w 10 -A CADMUS_EXT -p tcp -m multiport --dports 80,443,18443 -j ACCEPT
           /usr/sbin/iptables -w 10 -A CADMUS_EXT -p icmp --icmp-type echo-request -j DROP
           /usr/sbin/iptables -w 10 -A CADMUS_EXT -j DROP
 
@@ -1071,7 +1088,14 @@
           #!/bin/sh
           set -eu
 
-          PUB_IF="$(/usr/sbin/ip route get 203.0.113.1 2>/dev/null | awk '{for (i=1; i<=NF; i++) if ($i=="dev") {print $(i+1); exit}}')"
+          PUB_IF=""
+          for i in $(seq 1 30); do
+              PUB_IF="$(/usr/sbin/ip route get 203.0.113.1 2>/dev/null | awk '{for (i=1; i<=NF; i++) if ($i=="dev") {print $(i+1); exit}}')"
+              if [ -n "$PUB_IF" ]; then
+                  break
+              fi
+              sleep 1
+          done
           [ -n "$PUB_IF" ] || { echo "Unable to determine public DMZ interface" >&2; exit 1; }
 
           /usr/sbin/iptables -w 10 -N CADMUS_EXT 2>/dev/null || true
@@ -1127,7 +1151,14 @@
           #!/bin/sh
           set -eu
 
-          PUB_IF="$(/usr/sbin/ip route get 203.0.113.1 2>/dev/null | awk '{for (i=1; i<=NF; i++) if ($i=="dev") {print $(i+1); exit}}')"
+          PUB_IF=""
+          for i in $(seq 1 30); do
+              PUB_IF="$(/usr/sbin/ip route get 203.0.113.1 2>/dev/null | awk '{for (i=1; i<=NF; i++) if ($i=="dev") {print $(i+1); exit}}')"
+              if [ -n "$PUB_IF" ]; then
+                  break
+              fi
+              sleep 1
+          done
           [ -n "$PUB_IF" ] || { echo "Unable to determine public DMZ interface" >&2; exit 1; }
 
           /usr/sbin/iptables -w 10 -N CADMUS_EXT 2>/dev/null || true
