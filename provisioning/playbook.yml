@@ -171,6 +171,15 @@
       user_access_sudo: true
 
   tasks:
+    # Kali images boot with a stack-prefixed hostname that /etc/hosts does not
+    # resolve, which makes every sudo call emit "unable to resolve host".
+    - name: Ensure /etc/hosts resolves the renamed hostname
+      ansible.builtin.lineinfile:
+        path: /etc/hosts
+        regexp: '^127\.0\.1\.1\b'
+        line: "127.0.1.1 {{ ansible_hostname }}"
+        state: present
+
     - name: Install external scanning and enumeration tools
       ansible.builtin.apt:
         name:
