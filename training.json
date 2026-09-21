@@ -387,7 +387,7 @@
           ]
         }
       ],
-      "instructions": "Five questions on the perimeter you mapped during the exercise, all answerable from output you have already produced. If you did not keep your results: the gateway comes from `ip route get 203.0.113.5`, `sudo nmap -Pn -sV -sC <ip>` against the address in question covers the next three, and `sudo ike-scan --ikev2 --dhgroup=14 203.0.113.13` the last.",
+      "instructions": "Five questions on the perimeter you mapped during the exercise, all answerable from output you have already produced. If you did not keep your results: the gateway comes from `ip route get 203.0.113.5`, or from a `traceroute` to the same address, `sudo nmap -Pn -sV -sC <ip>` against the address in question covers the next three, and `sudo ike-scan --ikev2 --dhgroup=14 203.0.113.13` the last.",
       "assessment_type": "TEST"
     },
     {
