@@ -107,7 +107,7 @@
       "hints": [
         {
           "title": "Outside The Top Thousand",
-          "content": "`nmap` scans its top 1000 ports unless told otherwise, and a service placed deliberately out of the way will simply not appear. `sudo nmap -Pn -p- <target_ip>` covers all 65535.\n\nThese hosts drop unwanted traffic rather than refusing it, so a full scan is slow — `--min-rate` is worth using.",
+          "content": "`nmap` scans its top 1000 ports unless told otherwise, and a service placed deliberately out of the way will simply not appear. `sudo nmap -Pn -p- <target_ip>` covers all 65535.\n\nThese hosts drop unwanted traffic rather than refusing it, so nmap waits out a timeout on every closed port. Use `--min-rate 2000`: with it the scan takes well under two minutes, without it expect to be waiting half an hour.",
           "hint_penalty": 5,
           "order": 0
         },
