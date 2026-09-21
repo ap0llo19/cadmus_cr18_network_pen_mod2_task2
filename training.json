@@ -358,7 +358,7 @@
         },
         {
           "question_type": "MCQ",
-          "text": "Which version of IKE does 203.0.113.13 present on UDP/500?",
+          "text": "Run `sudo ike-scan --ikev2 --dhgroup=14 203.0.113.13`. Which version of IKE does the gateway present on UDP/500?",
           "points": 10,
           "penalty": 0,
           "order": 4,
