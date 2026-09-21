@@ -328,14 +328,14 @@
         },
         {
           "question_type": "MCQ",
-          "text": "Which TCP port on 203.0.113.9 is used for SMTP Submission?",
+          "text": "203.0.113.9 exposes three SMTP-speaking ports. Which one does nmap identify as `ssl/smtp` rather than plain `smtp`?",
           "points": 10,
           "penalty": 0,
           "order": 3,
           "answer_required": true,
           "choices": [
             {
-              "text": "587",
+              "text": "465",
               "correct": true,
               "order": 0
             },
@@ -345,7 +345,7 @@
               "order": 1
             },
             {
-              "text": "465",
+              "text": "587",
               "correct": false,
               "order": 2
             },
