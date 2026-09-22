@@ -86,6 +86,25 @@
         line: 'Banner /etc/issue.net'
       notify: Restart SSH
 
+    # nmap opens a connection per NSE script - ssh-hostkey and ssh2-enum-algos
+    # each get their own, on top of the -sV probe. The stock 10:30:100 starts
+    # dropping unauthenticated connections past ten, and a dropped one is closed
+    # before the identification string, which surfaces as
+    # "kex_exchange_identification: read: Connection reset by peer" and a failed
+    # ssh-hostkey script. On a one-vCPU host each handshake is slow enough that
+    # they pile up, and several trainees scanning at once makes it worse.
+    - name: Raise the unauthenticated connection limit for scanning
+      ansible.builtin.copy:
+        content: |
+          MaxStartups 100:30:200
+          MaxSessions 50
+        dest: /etc/ssh/sshd_config.d/10-lab.conf
+        owner: root
+        group: root
+        mode: '0644'
+        validate: /usr/sbin/sshd -t -f %s
+      notify: Restart SSH
+
     - name: Ensure SSH is running
       ansible.builtin.systemd:
         name: ssh
