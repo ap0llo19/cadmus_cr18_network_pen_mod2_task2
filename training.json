@@ -290,13 +290,13 @@
           "answer_required": true,
           "choices": [
             {
-              "text": "nginx",
-              "correct": true,
+              "text": "Apache httpd",
+              "correct": false,
               "order": 0
             },
             {
-              "text": "Apache httpd",
-              "correct": false,
+              "text": "nginx",
+              "correct": true,
               "order": 1
             },
             {
@@ -335,13 +335,13 @@
           "answer_required": true,
           "choices": [
             {
-              "text": "465",
-              "correct": true,
+              "text": "25",
+              "correct": false,
               "order": 0
             },
             {
-              "text": "25",
-              "correct": false,
+              "text": "465",
+              "correct": true,
               "order": 1
             },
             {
