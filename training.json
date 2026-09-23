@@ -29,8 +29,8 @@
       "order": 1,
       "estimated_duration": 0,
       "minimal_possible_solve_time": null,
-      "passkey": "start-training",
-      "cloud_content": "Open the Kali desktop on **pentestvm** and log in.\n\n1. In the topology overview on the right, right-click on **`pentestvm`** and choose **`Open GUI`** (or **`Open GUI In New Window`** if you prefer a separate window). The Kali display manager loads in your browser.\n2. Log in with username **`user`** and password **`Password123`**.\n3. Open a terminal from the desktop.\n\nIf you prefer SSH, the setup is documented at https://docs.platform.cyberrange.cz/user-guide-advanced/sandboxes/sandbox-access/#user-access. SSH makes copy-paste easier but takes a few minutes to configure.\n\nWhen you are in, submit **`start-training`** to unlock the next level.",
+      "passkey": "start",
+      "cloud_content": "Open the Kali desktop on **vma** and log in.\n\n1. In the topology overview on the right, right-click on **`vma`** and choose **`Open GUI`** (or **`Open GUI In New Window`** if you prefer a separate window). The Kali display manager loads in your browser.\n2. Log in with username **`user`** and password **`Password123`**.\n3. Open a terminal from the desktop.\n\nIf you prefer SSH, the setup is documented at https://docs.platform.cyberrange.cz/user-guide-advanced/sandboxes/sandbox-access/#user-access. SSH makes copy-paste easier but takes a few minutes to configure.\n\nWhen you are in, submit **`start`** to unlock the next level.",
       "local_content": "This sandbox has not been validated for local-only deployment."
     },
     {
@@ -290,13 +290,13 @@
           "answer_required": true,
           "choices": [
             {
-              "text": "nginx",
-              "correct": true,
+              "text": "Apache httpd",
+              "correct": false,
               "order": 0
             },
             {
-              "text": "Apache httpd",
-              "correct": false,
+              "text": "nginx",
+              "correct": true,
               "order": 1
             },
             {
@@ -335,13 +335,13 @@
           "answer_required": true,
           "choices": [
             {
-              "text": "465",
-              "correct": true,
+              "text": "25",
+              "correct": false,
               "order": 0
             },
             {
-              "text": "25",
-              "correct": false,
+              "text": "465",
+              "correct": true,
               "order": 1
             },
             {

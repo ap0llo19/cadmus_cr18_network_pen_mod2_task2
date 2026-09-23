@@ -15,12 +15,12 @@ documentation ranges, so nothing here can collide with real address space.
 | Node      | Image               | IP             | Role |
 | --------- | ------------------- | -------------- | ---- |
 | router    | debian-12-x86_64    | 198.51.100.1 / 203.0.113.1 | Forwards between the attacker segment and the DMZ. |
-| pentestvm | kali-2026.1-x86_64  | 198.51.100.10  | Trainee workstation. |
+| vma       | kali-2026.1-x86_64  | 198.51.100.10  | Trainee workstation. |
 | web-gw01  | ubuntu-noble-x86_64 | 203.0.113.5    | nginx on 80/443/18443. Virtual hosts for `www`, `portal`, `partners` and an administration gateway. Two certificates: `*.cadmus-corp.lab` on 443 and `admin.cadmus-corp.lab` (SAN `edge-admin.cadmus-corp.lab`) on 18443 — deliberately outside nmap's default port set. |
 | mail01    | ubuntu-noble-x86_64 | 203.0.113.9    | Postfix and Dovecot on 25/465/587/993. Everything else is dropped, so it does not answer default host discovery. |
 | vpn01     | ubuntu-noble-x86_64 | 203.0.113.13   | nginx on 443 plus strongSwan IKEv2 on UDP 500/4500. Its certificate is `CN=vpn.cadmus-corp.lab` with `remote.cadmus-corp.lab` in the SAN list. |
 
-`pentestvm` runs on `c2_r4_d30` — Kali's image sets a 25 GiB `min_disk`, so `standard.small` is not an option. The four other nodes are `standard.small`.
+`vma` runs on `c2_r4_d30` — Kali's image sets a 25 GiB `min_disk`, so `standard.small` is not an option. The four other nodes are `standard.small`.
 
 ## Provisioning
 
@@ -30,7 +30,7 @@ host:
 - **baseline** — disables unattended upgrades, installs common packages, sets
   hostnames and an SSH banner.
 - **router** — enables IPv4 forwarding and installs it persistently.
-- **pentestvm** — installs the external scanning toolset, adds a persistent
+- **vma** — installs the external scanning toolset, adds a persistent
   route to the DMZ, stages a virtual-host wordlist, and provisions the trainee
   login `user` / `Password123` (sudo) via the `user-access` role.
 - **targets** — add a return route to the attacker segment, then deploy their
@@ -44,7 +44,7 @@ interface at boot from the route table.
 Eleven levels, 200 points, roughly 50 minutes. Five graded hands-on levels,
 then a short knowledge check.
 
-1. Open the Kali desktop on **pentestvm** (`Open GUI`) and log in as
+1. Open the Kali desktop on **vma** (`Open GUI`) and log in as
    `user` / `Password123`.
 2. *Background* — routing to the range, and host discovery.
 3. **Reach what you cannot see** — route to the range, sweep it, notice three

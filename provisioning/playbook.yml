@@ -12,7 +12,7 @@
 #     IKE/IPsec identification, correlation, and reporting only.
 #
 # Routed lab topology:
-#   pentestvm   198.51.100.10   trainee workstation
+#   vma   198.51.100.10   trainee workstation
 #   router      198.51.100.1    attacker-side gateway
 #   router      203.0.113.1     public-DMZ gateway
 #   WEB-GW01    203.0.113.5     nginx web gateway
@@ -26,10 +26,43 @@
 
 
 # ----------------------------------------------------------------------------
+#  man - the sandbox management node. It is not in topology.yml; the platform
+#  adds it to the generated inventory. Every trainee SSH and GUI session is
+#  brokered through it, so an unattended upgrade firing mid-lab can stall or
+#  drop those sessions.
+# ----------------------------------------------------------------------------
+- name: Disable apt auto-update on the management node
+  hosts: man
+  become: true
+
+  tasks:
+    - name: Disable unattended upgrades in apt periodic config
+      ansible.builtin.copy:
+        dest: /etc/apt/apt.conf.d/20auto-upgrades
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          APT::Periodic::Update-Package-Lists "0";
+          APT::Periodic::Unattended-Upgrade "0";
+
+    - name: Disable apt daily timers
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: stopped
+        enabled: false
+        masked: true
+      loop:
+        - apt-daily.timer
+        - apt-daily-upgrade.timer
+      failed_when: false
+
+
+# ----------------------------------------------------------------------------
 # Common Linux baseline
 # ----------------------------------------------------------------------------
 - name: Common baseline for external lab Linux machines
-  hosts: pentestvm:web-gw01:mail01:vpn01:router
+  hosts: vma:web-gw01:mail01:vpn01:router
   become: true
   gather_facts: true
 
@@ -84,6 +117,25 @@
         path: /etc/ssh/sshd_config
         regexp: '^#?Banner'
         line: 'Banner /etc/issue.net'
+      notify: Restart SSH
+
+    # nmap opens a connection per NSE script - ssh-hostkey and ssh2-enum-algos
+    # each get their own, on top of the -sV probe. The stock 10:30:100 starts
+    # dropping unauthenticated connections past ten, and a dropped one is closed
+    # before the identification string, which surfaces as
+    # "kex_exchange_identification: read: Connection reset by peer" and a failed
+    # ssh-hostkey script. On a one-vCPU host each handshake is slow enough that
+    # they pile up, and several trainees scanning at once makes it worse.
+    - name: Raise the unauthenticated connection limit for scanning
+      ansible.builtin.copy:
+        content: |
+          MaxStartups 100:30:200
+          MaxSessions 50
+        dest: /etc/ssh/sshd_config.d/10-lab.conf
+        owner: root
+        group: root
+        mode: '0644'
+        validate: /usr/sbin/sshd -t -f %s
       notify: Restart SSH
 
     - name: Ensure SSH is running
@@ -157,10 +209,10 @@
 
 
 # ----------------------------------------------------------------------------
-# PENTESTVM - trainee workstation
+# VMA - trainee workstation
 # ----------------------------------------------------------------------------
-- name: Provision pentestvm (external attacker)
-  hosts: pentestvm
+- name: Provision vma (external attacker)
+  hosts: vma
   become: true
   gather_facts: true
 
@@ -173,6 +225,16 @@
   tasks:
     # Kali images boot with a stack-prefixed hostname that /etc/hosts does not
     # resolve, which makes every sudo call emit "unable to resolve host".
+    # The base image ships '127.0.1.1 kali.kali kali'. The platform renames the
+    # host, so that alias is stale, and the task below manages only its own line -
+    # which leaves two 127.0.1.1 entries and tells anyone who reads /etc/hosts that
+    # this is a stock Kali image rather than a company workstation.
+    - name: Drop the base image's leftover 127.0.1.1 alias
+      ansible.builtin.lineinfile:
+        path: /etc/hosts
+        regexp: '^127\.0\.1\.1\s+kali'
+        state: absent
+
     - name: Ensure /etc/hosts resolves the renamed hostname
       ansible.builtin.lineinfile:
         path: /etc/hosts
