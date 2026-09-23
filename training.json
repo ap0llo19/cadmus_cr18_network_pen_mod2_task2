@@ -30,7 +30,7 @@
       "estimated_duration": 0,
       "minimal_possible_solve_time": null,
       "passkey": "start",
-      "cloud_content": "Open the Kali desktop on **pentestvm** and log in.\n\n1. In the topology overview on the right, right-click on **`pentestvm`** and choose **`Open GUI`** (or **`Open GUI In New Window`** if you prefer a separate window). The Kali display manager loads in your browser.\n2. Log in with username **`user`** and password **`Password123`**.\n3. Open a terminal from the desktop.\n\nIf you prefer SSH, the setup is documented at https://docs.platform.cyberrange.cz/user-guide-advanced/sandboxes/sandbox-access/#user-access. SSH makes copy-paste easier but takes a few minutes to configure.\n\nWhen you are in, submit **`start`** to unlock the next level.",
+      "cloud_content": "Open the Kali desktop on **vma** and log in.\n\n1. In the topology overview on the right, right-click on **`vma`** and choose **`Open GUI`** (or **`Open GUI In New Window`** if you prefer a separate window). The Kali display manager loads in your browser.\n2. Log in with username **`user`** and password **`Password123`**.\n3. Open a terminal from the desktop.\n\nIf you prefer SSH, the setup is documented at https://docs.platform.cyberrange.cz/user-guide-advanced/sandboxes/sandbox-access/#user-access. SSH makes copy-paste easier but takes a few minutes to configure.\n\nWhen you are in, submit **`start`** to unlock the next level.",
       "local_content": "This sandbox has not been validated for local-only deployment."
     },
     {

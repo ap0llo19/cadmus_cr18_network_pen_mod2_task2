@@ -12,7 +12,7 @@
 #     IKE/IPsec identification, correlation, and reporting only.
 #
 # Routed lab topology:
-#   pentestvm   198.51.100.10   trainee workstation
+#   vma   198.51.100.10   trainee workstation
 #   router      198.51.100.1    attacker-side gateway
 #   router      203.0.113.1     public-DMZ gateway
 #   WEB-GW01    203.0.113.5     nginx web gateway
@@ -29,7 +29,7 @@
 # Common Linux baseline
 # ----------------------------------------------------------------------------
 - name: Common baseline for external lab Linux machines
-  hosts: pentestvm:web-gw01:mail01:vpn01:router
+  hosts: vma:web-gw01:mail01:vpn01:router
   become: true
   gather_facts: true
 
@@ -176,10 +176,10 @@
 
 
 # ----------------------------------------------------------------------------
-# PENTESTVM - trainee workstation
+# VMA - trainee workstation
 # ----------------------------------------------------------------------------
-- name: Provision pentestvm (external attacker)
-  hosts: pentestvm
+- name: Provision vma (external attacker)
+  hosts: vma
   become: true
   gather_facts: true
 
