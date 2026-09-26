@@ -50,25 +50,25 @@
       "answer": "203.0.113.9",
       "answer_variable_name": null,
       "content": "Start with the range and nothing else: `203.0.113.0/28`.\n\nWork out how your traffic gets there, then sweep it and take stock of what answers. Then look at the size of the range against the number of replies you got, and satisfy yourself that the gap is empty — because it is not.\n\nOne address on this range hosts a live, fully configured service and still does not answer a standard sweep.\n\nSubmit **the IP address of that host**.",
-      "solution": "* `ip route get 203.0.113.5` → traffic leaves via the gateway on your own segment, `198.51.100.1`.\n* `sudo nmap -sn 203.0.113.0/28` → four addresses answer: the DMZ gateway at `.1`, an address belonging to the platform itself at `.2`, the web gateway at `.5`, and the VPN endpoint at `.13`. The last two answer because they permit tcp/80 and tcp/443, which is exactly what `-sn` probes.\n* A `/28` is sixteen addresses and you have four, only two of which are client systems. Scan the rest without relying on discovery: `sudo nmap -Pn -p 25,80,443,587 203.0.113.0/28`.\n* `203.0.113.9` answers on tcp/25 and tcp/587. It permits only its own mail ports and drops everything else, so the sweep never saw it.\n\n**Answer: 203.0.113.9**",
+      "solution": "* `ip route get 203.0.113.5` → traffic leaves via the gateway on your own segment, `198.51.100.1`.\n* `sudo nmap -sn 203.0.113.0/28` → three addresses answer: the DMZ gateway at `.1`, the web gateway at `.5`, and the VPN endpoint at `.13`. The last two answer because they permit tcp/80 and tcp/443, which is exactly what `-sn` probes.\n* A `/28` is sixteen addresses and you have three, only two of which are client systems. Scan the rest without relying on discovery: `sudo nmap -Pn -p 25,80,443,587 203.0.113.0/28`.\n* `203.0.113.9` answers on tcp/25 and tcp/587. It permits only its own mail ports and drops everything else, so the sweep never saw it.\n\n**Answer: 203.0.113.9**",
       "solution_penalized": true,
       "hints": [
         {
           "title": "Count Against The Range",
           "content": "A `/28` holds sixteen addresses. Compare that against the number of replies your sweep produced. If the two do not account for each other, the difference is not proof of absence — it is where you have not looked yet.",
-          "hint_penalty": 5,
+          "hint_penalty": 2,
           "order": 0
         },
         {
           "title": "Stop Asking, Just Scan",
           "content": "`-sn` reports a host down when none of its probes are answered, which is not the same as the host being absent. `-Pn` skips discovery and scans the address anyway.\n\nTry `sudo nmap -Pn -p 25,80,443,587 203.0.113.0/28` and watch which address turns up that the sweep missed.",
-          "hint_penalty": 8,
+          "hint_penalty": 4,
           "order": 1
         }
       ],
       "incorrect_answer_limit": 5,
       "attachments": [],
-      "max_score": 30,
+      "max_score": 15,
       "variant_answers": false,
       "reference_solution": [],
       "mitre_techniques": [
@@ -108,19 +108,19 @@
         {
           "title": "Outside The Top Thousand",
           "content": "`nmap` scans its top 1000 ports unless told otherwise, and a service placed deliberately out of the way will simply not appear. `sudo nmap -Pn -p- <target_ip>` covers all 65535.\n\nThese hosts drop unwanted traffic rather than refusing it, so nmap waits out a timeout on every closed port. Use `--min-rate 2000`: with it the scan takes well under two minutes, without it expect to be waiting half an hour.",
-          "hint_penalty": 5,
+          "hint_penalty": 2,
           "order": 0
         },
         {
           "title": "Read The Whole Certificate",
           "content": "Once you have the port, ask what certificate it serves and look past the Common Name. The Subject Alternative Name list carries every hostname the certificate covers.\n\n`openssl s_client -connect <ip>:<port> </dev/null 2>/dev/null | openssl x509 -noout -subject -ext subjectAltName`",
-          "hint_penalty": 8,
+          "hint_penalty": 4,
           "order": 1
         }
       ],
       "incorrect_answer_limit": 5,
       "attachments": [],
-      "max_score": 30,
+      "max_score": 15,
       "variant_answers": false,
       "reference_solution": [],
       "mitre_techniques": [
@@ -152,19 +152,19 @@
         {
           "title": "The CN Is Not The Whole Story",
           "content": "A certificate's Common Name is only one of the names it is valid for. The Subject Alternative Name extension lists all of them, and it is routinely populated with internal names nobody thought about before publishing.",
-          "hint_penalty": 5,
+          "hint_penalty": 2,
           "order": 0
         },
         {
           "title": "Ask For The Extension",
           "content": "`openssl x509 -noout -subject` alone gives you the CN and stops. Add `-ext subjectAltName` to see the rest.\n\n`openssl s_client -connect <ip>:443 </dev/null 2>/dev/null | openssl x509 -noout -subject -ext subjectAltName`",
-          "hint_penalty": 8,
+          "hint_penalty": 4,
           "order": 1
         }
       ],
       "incorrect_answer_limit": 5,
       "attachments": [],
-      "max_score": 30,
+      "max_score": 15,
       "variant_answers": false,
       "reference_solution": [],
       "mitre_techniques": [
@@ -192,19 +192,19 @@
         {
           "title": "A Whole Protocol You Have Not Scanned",
           "content": "Everything so far has been TCP. UDP is a separate scan and nmap does not do it unless asked: `-sU`. Keep the port range narrow, because UDP scanning is slow.\n\nFor a VPN, the ports worth trying are 500 and 4500.",
-          "hint_penalty": 5,
+          "hint_penalty": 2,
           "order": 0
         },
         {
           "title": "What nmap Calls It",
           "content": "Run `sudo nmap -Pn -sU -p 500,4500 <target_ip>` and read the SERVICE column for port 500. That is the answer — the protocol name, not the product.",
-          "hint_penalty": 8,
+          "hint_penalty": 4,
           "order": 1
         }
       ],
       "incorrect_answer_limit": 5,
       "attachments": [],
-      "max_score": 30,
+      "max_score": 15,
       "variant_answers": false,
       "reference_solution": [],
       "mitre_techniques": [
@@ -233,19 +233,19 @@
         {
           "title": "Let It Introduce Itself",
           "content": "SMTP servers send a `220` greeting the moment you connect, before any command. You do not need to authenticate or send anything to read it — just open the connection and look.\n\n`nc <target_ip> 25`",
-          "hint_penalty": 5,
+          "hint_penalty": 2,
           "order": 0
         },
         {
           "title": "The Name Is In The Greeting",
           "content": "The greeting line looks like `220 <hostname> ESMTP <product>`. The hostname is the part immediately after the `220`, and it is what the server believes it is called rather than what you dialled.\n\n`swaks --server <target_ip> --quit-after BANNER` prints it and exits cleanly.",
-          "hint_penalty": 8,
+          "hint_penalty": 4,
           "order": 1
         }
       ],
       "incorrect_answer_limit": 5,
       "attachments": [],
-      "max_score": 30,
+      "max_score": 15,
       "variant_answers": false,
       "reference_solution": [],
       "mitre_techniques": [
@@ -269,7 +269,7 @@
         {
           "question_type": "FFQ",
           "text": "What gateway does your traffic use to reach 203.0.113.0/28?",
-          "points": 10,
+          "points": 5,
           "penalty": 0,
           "order": 0,
           "answer_required": true,
@@ -284,7 +284,7 @@
         {
           "question_type": "MCQ",
           "text": "What web-server software is exposed on 203.0.113.5's web ports?",
-          "points": 10,
+          "points": 5,
           "penalty": 0,
           "order": 1,
           "answer_required": true,
@@ -314,7 +314,7 @@
         {
           "question_type": "FFQ",
           "text": "What Common Name (CN) is present in the TLS certificate served on 203.0.113.5:443?",
-          "points": 10,
+          "points": 5,
           "penalty": 0,
           "order": 2,
           "answer_required": true,
@@ -329,7 +329,7 @@
         {
           "question_type": "MCQ",
           "text": "203.0.113.9 exposes three SMTP-speaking ports. Which one does nmap identify as `ssl/smtp` rather than plain `smtp`?",
-          "points": 10,
+          "points": 5,
           "penalty": 0,
           "order": 3,
           "answer_required": true,
@@ -359,7 +359,7 @@
         {
           "question_type": "MCQ",
           "text": "Run `sudo ike-scan --ikev2 --dhgroup=14 203.0.113.13`. Which version of IKE does the gateway present on UDP/500?",
-          "points": 10,
+          "points": 5,
           "penalty": 0,
           "order": 4,
           "answer_required": true,
